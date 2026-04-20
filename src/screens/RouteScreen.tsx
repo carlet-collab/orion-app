@@ -1,13 +1,24 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Linking, ActivityIndicator, Dimensions, Platform, SafeAreaView } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Linking, ActivityIndicator, Dimensions, SafeAreaView } from 'react-native'
 import MapView, { Polyline, Marker, PROVIDER_GOOGLE } from 'react-native-maps'
 import * as Location from 'expo-location'
+import * as Speech from 'expo-speech'
 import { useKeepAwake } from 'expo-keep-awake'
 import { getDirectionsUrl, getPlacesUrl, haversine, decodePolyline, stripHtml, FILTERS } from '../lib/maps'
 
 const C = { primary: '#1A1A1A', accent: '#7BA7BC', bg: '#FAFAFA', surface: '#FFFFFF', border: '#E8E8E8', hint: '#AEAEB2', secondary: '#6E6E73' }
 const { width: W } = Dimensions.get('window')
 const DAY_COLORS = ['#7BA7BC','#8BAF8B','#9B8BB4','#7BBCB0','#C4A882','#BC7B7B']
+
+// Find closest point index on polyline to current position
+function closestPolylineIndex(coords: any[], lat: number, lng: number): number {
+  let minDist = Infinity, minIdx = 0
+  coords.forEach((c, i) => {
+    const d = haversine(lat, lng, c.latitude, c.longitude)
+    if (d < minDist) { minDist = d; minIdx = i }
+  })
+  return minIdx
+}
 
 export default function RouteScreen({ route, navigation }: any) {
   const { origin, destination, planByDay, limitType, limitValue } = route.params
@@ -17,13 +28,20 @@ export default function RouteScreen({ route, navigation }: any) {
   const locationSubRef = useRef<any>(null)
   const currentStepRef = useRef(0)
   const lastFetchRef = useRef<{latitude: number, longitude: number} | null>(null)
+  const lastRerouteRef = useRef<number>(0)
+  const polylineRef = useRef<any[]>([])
+  const routeInfoRef = useRef<any>(null)
+  const navigatingRef = useRef(false)
+  const lastSpokenStepRef = useRef(-1)
 
   const [routeInfo, setRouteInfo] = useState<any>(null)
   const [steps, setSteps] = useState<any[]>([])
   const [stages, setStages] = useState<any[]>([])
   const [polyline, setPolyline] = useState<any[]>([])
+  const [drivenPolyline, setDrivenPolyline] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [rerouting, setRerouting] = useState(false)
 
   const [places, setPlaces] = useState<any[]>([])
   const [placesLoading, setPlacesLoading] = useState(false)
@@ -33,13 +51,20 @@ export default function RouteScreen({ route, navigation }: any) {
   const [navigating, setNavigating] = useState(false)
   const [userLocation, setUserLocation] = useState<any>(null)
   const [currentStep, setCurrentStep] = useState(0)
+  const [voiceEnabled, setVoiceEnabled] = useState(true)
+
+  const stepsRef = useRef<any[]>([])
+  const activeFilterRef = useRef('lodging')
+
+  useEffect(() => { stepsRef.current = steps }, [steps])
+  useEffect(() => { activeFilterRef.current = activeFilter }, [activeFilter])
 
   const currentSteps = planByDay && stages.length > 0 ? (stages[activeDay]?.steps || []) : steps
   const activeF = FILTERS.find(f => f.key === activeFilter)!
 
-  useEffect(() => { fetchRoute() }, [])
+  useEffect(() => { fetchRoute(origin, destination) }, [])
   useEffect(() => { if (routeInfo) fetchPlaces(null) }, [activeFilter, activeDay, routeInfo])
-  useEffect(() => { return () => { locationSubRef.current?.remove() } }, [])
+  useEffect(() => { return () => { locationSubRef.current?.remove(); Speech.stop() } }, [])
 
   const getRadius = (info: any) => {
     if (!info) return 10000
@@ -49,45 +74,65 @@ export default function RouteScreen({ route, navigation }: any) {
     return 25000
   }
 
-  const fetchRoute = async () => {
-    setLoading(true)
+  const processRouteData = (data: any, isReroute = false) => {
+    const leg = data.routes[0].legs[0]
+    const coords = decodePolyline(data.routes[0].overview_polyline.points)
+    polylineRef.current = coords
+    setPolyline(coords)
+    setDrivenPolyline([])
+    const totalSec = leg.duration.value
+    const totalM = leg.distance.value
+    const limitSec = limitType==='days' ? totalSec/limitValue : limitType==='hours' ? limitValue*3600 : (limitValue/(totalM/1000))*totalSec
+    const numDays = planByDay ? (limitType==='days' ? limitValue : Math.ceil(totalSec/limitSec)) : 1
+    const info = {
+      distance: leg.distance.text, duration: leg.duration.text,
+      midLat: (leg.start_location.lat+leg.end_location.lat)/2,
+      midLng: (leg.start_location.lng+leg.end_location.lng)/2,
+      startLat: leg.start_location.lat, startLng: leg.start_location.lng,
+      endLat: leg.end_location.lat, endLng: leg.end_location.lng,
+      numDays, totalM
+    }
+    routeInfoRef.current = info
+    if (!isReroute) setRouteInfo(info)
+    const stepsWithCoords = leg.steps.map((s: any) => ({ ...s, endLat: s.end_location.lat, endLng: s.end_location.lng }))
+    stepsRef.current = stepsWithCoords
+    setSteps(stepsWithCoords)
+    currentStepRef.current = 0
+    setCurrentStep(0)
+    lastSpokenStepRef.current = -1
+    if (!isReroute && planByDay && numDays > 1) {
+      const arr: any[] = []
+      let acc=0, start={lat:leg.start_location.lat,lng:leg.start_location.lng}, daySteps:any[]=[], dist=0, dur=0
+      for (let i=0; i<stepsWithCoords.length; i++) {
+        const st=stepsWithCoords[i]; acc+=st.duration.value; daySteps.push(st); dist+=st.distance.value; dur+=st.duration.value
+        if (acc>=limitSec||i===stepsWithCoords.length-1) {
+          arr.push({ day:arr.length+1, startLat:start.lat, startLng:start.lng, endLat:st.end_location.lat, endLng:st.end_location.lng, distance:(dist/1000).toFixed(0)+' km', duration:Math.floor(dur/3600)+'h '+Math.floor((dur%3600)/60)+'m', steps:daySteps })
+          start={lat:st.end_location.lat,lng:st.end_location.lng}; daySteps=[]; dist=0; dur=0; acc=0
+        }
+      }
+      setStages(arr)
+    }
+  }
+
+  const fetchRoute = async (from: string, to: string, isReroute = false) => {
+    if (!isReroute) setLoading(true)
     try {
-      const res = await fetch(getDirectionsUrl(origin, destination))
+      const res = await fetch(getDirectionsUrl(from, to))
       const data = await res.json()
       if (data.status === 'OK' && data.routes?.[0]) {
-        const leg = data.routes[0].legs[0]
-        setPolyline(decodePolyline(data.routes[0].overview_polyline.points))
-        const totalSec = leg.duration.value
-        const totalM = leg.distance.value
-        const limitSec = limitType==='days' ? totalSec/limitValue : limitType==='hours' ? limitValue*3600 : (limitValue/(totalM/1000))*totalSec
-        const numDays = planByDay ? (limitType==='days' ? limitValue : Math.ceil(totalSec/limitSec)) : 1
-        const info = { distance: leg.distance.text, duration: leg.duration.text, midLat: (leg.start_location.lat+leg.end_location.lat)/2, midLng: (leg.start_location.lng+leg.end_location.lng)/2, startLat: leg.start_location.lat, startLng: leg.start_location.lng, endLat: leg.end_location.lat, endLng: leg.end_location.lng, numDays, totalM }
-        setRouteInfo(info)
-        const stepsWithCoords = leg.steps.map((s: any) => ({ ...s, endLat: s.end_location.lat, endLng: s.end_location.lng }))
-        setSteps(stepsWithCoords)
-        if (planByDay && numDays > 1) {
-          const arr: any[] = []
-          let acc=0, start={lat:leg.start_location.lat,lng:leg.start_location.lng}, daySteps:any[]=[], dist=0, dur=0
-          for (let i=0; i<stepsWithCoords.length; i++) {
-            const st=stepsWithCoords[i]; acc+=st.duration.value; daySteps.push(st); dist+=st.distance.value; dur+=st.duration.value
-            if (acc>=limitSec||i===stepsWithCoords.length-1) {
-              arr.push({ day:arr.length+1, startLat:start.lat, startLng:start.lng, endLat:st.end_location.lat, endLng:st.end_location.lng, distance:(dist/1000).toFixed(0)+' km', duration:Math.floor(dur/3600)+'h '+Math.floor((dur%3600)/60)+'m', steps:daySteps })
-              start={lat:st.end_location.lat,lng:st.end_location.lng}; daySteps=[]; dist=0; dur=0; acc=0
-            }
-          }
-          setStages(arr)
-        }
-      } else { setError('Could not get route.') }
-    } catch (e) { setError('Something went wrong.') }
-    setLoading(false)
+        processRouteData(data, isReroute)
+      } else { if (!isReroute) setError('Could not get route.') }
+    } catch (e) { if (!isReroute) setError('Something went wrong.') }
+    if (!isReroute) setLoading(false)
   }
 
   const fetchPlaces = async (pos: {latitude:number,longitude:number}|null) => {
-    if (!routeInfo) return
+    const info = routeInfoRef.current || routeInfo
+    if (!info) return
     setPlacesLoading(true)
-    const center = pos || { latitude: routeInfo.midLat, longitude: routeInfo.midLng }
+    const center = pos || { latitude: info.midLat, longitude: info.midLng }
     try {
-      const res = await fetch(getPlacesUrl(center.latitude, center.longitude, activeFilter, getRadius(routeInfo)))
+      const res = await fetch(getPlacesUrl(center.latitude, center.longitude, activeFilterRef.current, getRadius(info)))
       const data = await res.json()
       const seen = new Set<string>()
       const ex: Record<string,string[]> = { restaurant:['lodging','hotel','motel'], tourist_attraction:['lodging','hotel','restaurant'], travel_agency:['lodging','hotel','restaurant'], lodging:[] }
@@ -95,45 +140,111 @@ export default function RouteScreen({ route, navigation }: any) {
       setPlaces((data.results||[]).filter((p:any) => {
         if (seen.has(p.place_id)) return false; seen.add(p.place_id)
         const t:string[]=p.types||[]
-        if ((ex[activeFilter]||[]).some((e:string)=>t.includes(e))) return false
-        if ((req[activeFilter]||[]).length>0 && !(req[activeFilter]||[]).some((r:string)=>t.includes(r))) return false
+        if ((ex[activeFilterRef.current]||[]).some((e:string)=>t.includes(e))) return false
+        if ((req[activeFilterRef.current]||[]).length>0 && !(req[activeFilterRef.current]||[]).some((r:string)=>t.includes(r))) return false
         return true
       }).slice(0,18))
     } catch(e){console.error(e)}
     setPlacesLoading(false)
   }
 
+  const speak = (text: string) => {
+    if (!voiceEnabled) return
+    Speech.stop()
+    Speech.speak(text, { rate: 0.9, pitch: 1.0 })
+  }
+
   const onLocation = useCallback((loc: Location.LocationObject) => {
+    if (!navigatingRef.current) return
     const { latitude, longitude, heading } = loc.coords
     setUserLocation({ latitude, longitude, heading: heading || 0 })
+
+    // Smooth camera follow with heading rotation
     if (mapRef.current) {
-      mapRef.current.animateCamera({ center:{latitude,longitude}, heading:heading||0, pitch:50, zoom:17 }, { duration:600 })
+      mapRef.current.animateCamera({
+        center: { latitude, longitude },
+        heading: heading || 0,
+        pitch: 50,
+        zoom: 17
+      }, { duration: 600 })
     }
-    const step = currentSteps[currentStepRef.current]
-    if (step?.endLat && step?.endLng) {
-      if (haversine(latitude,longitude,step.endLat,step.endLng)<50 && currentStepRef.current<currentSteps.length-1) {
-        const next=currentStepRef.current+1; currentStepRef.current=next; setCurrentStep(next)
+
+    // Update driven polyline — grey out the portion behind us
+    const allCoords = polylineRef.current
+    if (allCoords.length > 0) {
+      const closestIdx = closestPolylineIndex(allCoords, latitude, longitude)
+      setDrivenPolyline(allCoords.slice(0, closestIdx + 1))
+    }
+
+    // Auto-advance steps within 50m of step end
+    const steps = stepsRef.current
+    const stepIdx = currentStepRef.current
+    if (steps[stepIdx]?.endLat && steps[stepIdx]?.endLng) {
+      const distToEnd = haversine(latitude, longitude, steps[stepIdx].endLat, steps[stepIdx].endLng)
+      if (distToEnd < 50 && stepIdx < steps.length - 1) {
+        const next = stepIdx + 1
+        currentStepRef.current = next
+        setCurrentStep(next)
+        // Voice for next step
+        if (lastSpokenStepRef.current !== next && steps[next]) {
+          lastSpokenStepRef.current = next
+          speak(stripHtml(steps[next].html_instructions) + '. ' + (steps[next].distance?.text || ''))
+        }
       }
     }
-    const last=lastFetchRef.current
-    if (!last||haversine(latitude,longitude,last.latitude,last.longitude)>2000) {
-      lastFetchRef.current={latitude,longitude}; fetchPlaces({latitude,longitude})
+
+    // Rerouting — check if off route (>150m from nearest polyline point)
+    const now = Date.now()
+    if (now - lastRerouteRef.current > 10000) { // max once per 10 seconds
+      const allCoords = polylineRef.current
+      if (allCoords.length > 0) {
+        const closestIdx = closestPolylineIndex(allCoords, latitude, longitude)
+        const distToRoute = haversine(latitude, longitude, allCoords[closestIdx].latitude, allCoords[closestIdx].longitude)
+        if (distToRoute > 150) {
+          lastRerouteRef.current = now
+          setRerouting(true)
+          speak('Recalculating route.')
+          const currentPos = `${latitude},${longitude}`
+          fetchRoute(currentPos, destination, true).then(() => setRerouting(false))
+        }
+      }
     }
-  }, [currentSteps, activeFilter, routeInfo])
+
+    // Refresh places every 2km
+    const last = lastFetchRef.current
+    if (!last || haversine(latitude, longitude, last.latitude, last.longitude) > 2000) {
+      lastFetchRef.current = { latitude, longitude }
+      fetchPlaces({ latitude, longitude })
+    }
+  }, [voiceEnabled, destination])
 
   const startNavigation = async () => {
     const { status } = await Location.requestForegroundPermissionsAsync()
-    if (status!=='granted') { alert('Location permission needed'); return }
-    setNavigating(true); setCurrentStep(0); currentStepRef.current=0
+    if (status !== 'granted') { alert('Location permission needed'); return }
+    navigatingRef.current = true
+    setNavigating(true)
+    setCurrentStep(0)
+    currentStepRef.current = 0
+    lastSpokenStepRef.current = -1
+    const steps = stepsRef.current
+    if (steps[0]) speak('Starting navigation. ' + stripHtml(steps[0].html_instructions) + '. ' + (steps[0].distance?.text || ''))
     locationSubRef.current = await Location.watchPositionAsync(
-      { accuracy:Location.Accuracy.BestForNavigation, timeInterval:1000, distanceInterval:5 },
+      { accuracy: Location.Accuracy.BestForNavigation, timeInterval: 1000, distanceInterval: 5 },
       onLocation
     )
   }
 
   const stopNavigation = () => {
-    setNavigating(false); locationSubRef.current?.remove(); locationSubRef.current=null
-    if (mapRef.current && routeInfo) mapRef.current.animateCamera({ center:{latitude:routeInfo.midLat,longitude:routeInfo.midLng}, pitch:0, heading:0, zoom:7 }, {duration:800})
+    navigatingRef.current = false
+    setNavigating(false)
+    Speech.stop()
+    locationSubRef.current?.remove()
+    locationSubRef.current = null
+    setDrivenPolyline([])
+    const info = routeInfoRef.current || routeInfo
+    if (mapRef.current && info) {
+      mapRef.current.animateCamera({ center: { latitude: info.midLat, longitude: info.midLng }, pitch: 0, heading: 0, zoom: 7 }, { duration: 800 })
+    }
     fetchPlaces(null)
   }
 
@@ -145,29 +256,71 @@ export default function RouteScreen({ route, navigation }: any) {
 
       {/* Navigation banner */}
       {navigating && (
-        <SafeAreaView style={{backgroundColor:'#1A1A1A'}}>
+        <SafeAreaView style={{backgroundColor: rerouting ? '#C97B7B' : '#1A1A1A'}}>
           <View style={s.navBanner}>
-            <TouchableOpacity onPress={()=>{const n=Math.max(0,currentStepRef.current-1);currentStepRef.current=n;setCurrentStep(n)}} style={s.navBtn}><Text style={s.navBtnTxt}>←</Text></TouchableOpacity>
+            <TouchableOpacity onPress={()=>{const n=Math.max(0,currentStepRef.current-1);currentStepRef.current=n;setCurrentStep(n)}} style={s.navBtn}>
+              <Text style={s.navBtnTxt}>←</Text>
+            </TouchableOpacity>
             <View style={{flex:1,alignItems:'center',paddingHorizontal:8}}>
-              <Text style={s.navStepNum}>STEP {currentStep+1} / {currentSteps.length}</Text>
-              <Text style={s.navInstruction} numberOfLines={2}>{currentSteps[currentStep]?stripHtml(currentSteps[currentStep].html_instructions):'🎉 You have arrived!'}</Text>
-              {currentSteps[currentStep]?.distance?.text&&<Text style={s.navDist}>{currentSteps[currentStep].distance.text}</Text>}
+              {rerouting ? (
+                <Text style={[s.navInstruction,{color:'#fff'}]}>🔄 Recalculating...</Text>
+              ) : (
+                <>
+                  <Text style={s.navStepNum}>STEP {currentStep+1} / {currentSteps.length}</Text>
+                  <Text style={s.navInstruction} numberOfLines={2}>
+                    {currentSteps[currentStep] ? stripHtml(currentSteps[currentStep].html_instructions) : '🎉 You have arrived!'}
+                  </Text>
+                  {currentSteps[currentStep]?.distance?.text && <Text style={s.navDist}>{currentSteps[currentStep].distance.text}</Text>}
+                </>
+              )}
             </View>
-            <TouchableOpacity onPress={()=>{const n=Math.min(currentSteps.length-1,currentStepRef.current+1);currentStepRef.current=n;setCurrentStep(n)}} style={s.navBtn}><Text style={s.navBtnTxt}>→</Text></TouchableOpacity>
+            <TouchableOpacity onPress={()=>{const n=Math.min(currentSteps.length-1,currentStepRef.current+1);currentStepRef.current=n;setCurrentStep(n);if(stepsRef.current[n])speak(stripHtml(stepsRef.current[n].html_instructions))}} style={s.navBtn}>
+              <Text style={s.navBtnTxt}>→</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={()=>setVoiceEnabled(v=>!v)} style={[s.navBtn,{marginLeft:4,backgroundColor:voiceEnabled?'rgba(123,167,188,0.4)':'rgba(255,255,255,0.1)'}]}>
+              <Text style={{fontSize:16}}>{voiceEnabled?'🔊':'🔇'}</Text>
+            </TouchableOpacity>
           </View>
         </SafeAreaView>
       )}
 
       {/* Map */}
-      <MapView ref={mapRef} provider={PROVIDER_GOOGLE}
+      <MapView
+        ref={mapRef}
+        provider={PROVIDER_GOOGLE}
         style={{height: navigating ? W : 280}}
         initialRegion={{latitude:routeInfo.midLat,longitude:routeInfo.midLng,latitudeDelta:10,longitudeDelta:10}}
-        showsUserLocation={false} rotateEnabled pitchEnabled showsCompass showsTraffic={navigating} moveOnMarkerPress={false}>
-        {polyline.length>0&&<Polyline coordinates={polyline} strokeColor="#4A90C4" strokeWidth={5} zIndex={1}/>}
-        {userLocation&&<Marker coordinate={userLocation} anchor={{x:0.5,y:0.5}} flat={true} rotation={userLocation.heading||0}><View style={{width:20,height:20,borderRadius:10,backgroundColor:'#4A90C4',borderWidth:3,borderColor:'#fff'}}/></Marker>}
+        showsUserLocation={false}
+        rotateEnabled
+        pitchEnabled
+        showsCompass
+        showsTraffic={navigating}
+        moveOnMarkerPress={false}
+      >
+        {/* Driven portion — grey */}
+        {drivenPolyline.length > 1 && (
+          <Polyline coordinates={drivenPolyline} strokeColor="#AEAEB2" strokeWidth={5} zIndex={1}/>
+        )}
+        {/* Remaining route — blue */}
+        {polyline.length > 0 && (
+          <Polyline
+            coordinates={drivenPolyline.length > 1 ? polyline.slice(closestPolylineIndex(polyline, userLocation?.latitude || routeInfo.midLat, userLocation?.longitude || routeInfo.midLng)) : polyline}
+            strokeColor="#4A90C4"
+            strokeWidth={5}
+            zIndex={2}
+          />
+        )}
+        {/* User marker — arrow pointing direction */}
+        {userLocation && (
+          <Marker coordinate={userLocation} anchor={{x:0.5,y:0.5}} flat rotation={userLocation.heading||0}>
+            <View style={{width:22,height:22,borderRadius:11,backgroundColor:'#4A90C4',borderWidth:3,borderColor:'#fff'}}/>
+          </Marker>
+        )}
+        {/* Place markers */}
         {places.map((p,i)=>p.geometry?.location&&(
           <Marker key={i} coordinate={{latitude:p.geometry.location.lat,longitude:p.geometry.location.lng}} title={p.name} pinColor={activeF.color}/>
         ))}
+        {/* Day markers */}
         {stages.map((st,i)=>(
           <Marker key={i} coordinate={{latitude:st.endLat,longitude:st.endLng}}>
             <View style={[s.dayMarker,{backgroundColor:DAY_COLORS[i%DAY_COLORS.length]}]}><Text style={s.dayMarkerTxt}>{i+1}</Text></View>
@@ -210,7 +363,7 @@ export default function RouteScreen({ route, navigation }: any) {
           </View>
         )}
 
-        {/* Step by step - only when navigating */}
+        {/* Next steps during navigation */}
         {navigating&&(
           <View style={s.section}>
             <Text style={s.sectionTitle}>NEXT STEPS</Text>
@@ -284,7 +437,7 @@ const s = StyleSheet.create({
   city:{fontSize:15,fontWeight:'700',color:'#1A1A1A'},
   routeLine:{width:1,height:10,backgroundColor:'#E8E8E8',marginLeft:3,marginVertical:4},
   dot8:{width:8,height:8,borderRadius:4,backgroundColor:'#1A1A1A'},
-  navMainBtn:{borderRadius:12,padding:14,alignItems:'center',marginTop:16,marginBottom:12},
+  navMainBtn:{borderRadius:12,padding:14,alignItems:'center'},
   navMainBtnTxt:{color:'#fff',fontSize:12,fontWeight:'700',letterSpacing:2},
   stats:{flexDirection:'row',backgroundColor:'#F5F5F7',borderRadius:12,padding:14},
   statLabel:{fontSize:9,color:'#AEAEB2',fontWeight:'600',letterSpacing:1,marginBottom:4},
