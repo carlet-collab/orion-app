@@ -159,7 +159,7 @@ export default function RouteScreen({ route, navigation }: any) {
       {/* Map */}
       <MapView ref={mapRef} provider={PROVIDER_GOOGLE}
         style={{height: navigating ? W : 280}}
-        initialRegion={{latitude:routeInfo.midLat,longitude:routeInfo.midLng,latitudeDelta:8,longitudeDelta:8}}
+        region={{latitude:routeInfo.midLat,longitude:routeInfo.midLng,latitudeDelta:10,longitudeDelta:10}}
         showsUserLocation rotateEnabled pitchEnabled showsCompass showsTraffic={navigating}>
         {polyline.length>0&&<Polyline coordinates={polyline} strokeColor="#4A90C4" strokeWidth={5}/>}
         {places.map((p,i)=>p.geometry?.location&&(
@@ -179,9 +179,14 @@ export default function RouteScreen({ route, navigation }: any) {
           <View style={s.routeRow}><View style={s.dot8}/><Text style={s.city}>{origin}</Text></View>
           <View style={s.routeLine}/>
           <View style={s.routeRow}><View style={[s.dot8,{backgroundColor:C.accent}]}/><Text style={s.city}>{destination}</Text></View>
-          <TouchableOpacity onPress={navigating?stopNavigation:startNavigation} style={[s.navMainBtn,{backgroundColor:navigating?'#C97B7B':C.primary}]}>
-            <Text style={s.navMainBtnTxt}>{navigating?'⏹ STOP NAVIGATION':'🧭 START NAVIGATION'}</Text>
-          </TouchableOpacity>
+          <View style={{flexDirection:'row',gap:8,marginTop:16,marginBottom:12}}>
+            <TouchableOpacity onPress={navigating?stopNavigation:startNavigation} style={[s.navMainBtn,{flex:1,backgroundColor:navigating?'#C97B7B':C.primary,marginTop:0,marginBottom:0}]}>
+              <Text style={s.navMainBtnTxt}>{navigating?'⏹ STOP':'🧭 NAVIGATE'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={()=>navigation.goBack()} style={[s.navMainBtn,{backgroundColor:'#F5F5F7',marginTop:0,marginBottom:0,paddingHorizontal:16}]}>
+              <Text style={[s.navMainBtnTxt,{color:'#6E6E73'}]}>+ NEW</Text>
+            </TouchableOpacity>
+          </View>
           <View style={s.stats}>
             <View style={{flex:1}}><Text style={s.statLabel}>DISTANCE</Text><Text style={s.statVal}>{routeInfo.distance}</Text></View>
             <View style={s.statDiv}/>
