@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, SafeAreaView } from 'react-native'
 import { GOOGLE_MAPS_KEY } from '../lib/maps'
+import * as Location from 'expo-location'
 
 const C = { primary: '#1A1A1A', accent: '#7BA7BC', bg: '#FAFAFA', surface: '#FFFFFF', border: '#E8E8E8', hint: '#AEAEB2', secondary: '#6E6E73' }
 
@@ -12,6 +13,15 @@ export default function PlanScreen({ navigation }: any) {
   const [limitValue, setLimitValue] = useState(2)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  const getMyLocation = async () => {
+    const { status } = await Location.requestForegroundPermissionsAsync()
+    if (status !== 'granted') { setError('Location permission needed'); return }
+    const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
+    const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?latlng=${loc.coords.latitude},${loc.coords.longitude}&key=${GOOGLE_MAPS_KEY}`)
+    const data = await res.json()
+    if (data.results?.[0]) setOrigin(data.results[0].formatted_address)
+  }
 
   const handleSearch = async () => {
     if (!origin || !destination) { setError('Please enter both locations'); return }
@@ -46,7 +56,13 @@ export default function PlanScreen({ navigation }: any) {
           <Text style={s.subtitle}>Hotels, restaurants, attractions and tours — curated along your exact route.</Text>
 
           <View style={s.card}>
-            <Text style={s.label}>FROM</Text>
+            <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
+              <Text style={[s.label,{marginBottom:0}]}>FROM</Text>
+              <TouchableOpacity onPress={getMyLocation} style={{flexDirection:'row',alignItems:'center',gap:4,backgroundColor:'#F0F7FF',paddingHorizontal:10,paddingVertical:5,borderRadius:20,borderWidth:1,borderColor:'#7BA7BC30'}}>
+                <Text style={{fontSize:11}}>📍</Text>
+                <Text style={{fontSize:11,fontWeight:'600',color:'#7BA7BC'}}>Use my location</Text>
+              </TouchableOpacity>
+            </View>
             <TextInput value={origin} onChangeText={setOrigin} placeholder="Prague, Czech Republic" placeholderTextColor={C.hint} style={s.input} returnKeyType="next" autoCorrect={false} />
 
             <Text style={[s.label, { marginTop: 16 }]}>TO</Text>

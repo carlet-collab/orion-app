@@ -159,7 +159,7 @@ export default function RouteScreen({ route, navigation }: any) {
       {/* Map */}
       <MapView ref={mapRef} provider={PROVIDER_GOOGLE}
         style={{height: navigating ? W : 280}}
-        region={{latitude:routeInfo.midLat,longitude:routeInfo.midLng,latitudeDelta:10,longitudeDelta:10}}
+        initialRegion={{latitude:routeInfo.midLat,longitude:routeInfo.midLng,latitudeDelta:10,longitudeDelta:10}}
         showsUserLocation rotateEnabled pitchEnabled showsCompass showsTraffic={navigating}>
         {polyline.length>0&&<Polyline coordinates={polyline} strokeColor="#4A90C4" strokeWidth={5}/>}
         {places.map((p,i)=>p.geometry?.location&&(
