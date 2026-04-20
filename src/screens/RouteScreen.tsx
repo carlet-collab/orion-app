@@ -31,6 +31,7 @@ export default function RouteScreen({ route, navigation }: any) {
   const [activeDay, setActiveDay] = useState(0)
 
   const [navigating, setNavigating] = useState(false)
+  const [userLocation, setUserLocation] = useState<any>(null)
   const [currentStep, setCurrentStep] = useState(0)
 
   const currentSteps = planByDay && stages.length > 0 ? (stages[activeDay]?.steps || []) : steps
@@ -104,6 +105,7 @@ export default function RouteScreen({ route, navigation }: any) {
 
   const onLocation = useCallback((loc: Location.LocationObject) => {
     const { latitude, longitude, heading } = loc.coords
+    setUserLocation({ latitude, longitude, heading: heading || 0 })
     if (mapRef.current) {
       mapRef.current.animateCamera({ center:{latitude,longitude}, heading:heading||0, pitch:50, zoom:17 }, { duration:600 })
     }
@@ -160,8 +162,9 @@ export default function RouteScreen({ route, navigation }: any) {
       <MapView ref={mapRef} provider={PROVIDER_GOOGLE}
         style={{height: navigating ? W : 280}}
         initialRegion={{latitude:routeInfo.midLat,longitude:routeInfo.midLng,latitudeDelta:10,longitudeDelta:10}}
-        showsUserLocation rotateEnabled pitchEnabled showsCompass showsTraffic={navigating}>
-        {polyline.length>0&&<Polyline coordinates={polyline} strokeColor="#4A90C4" strokeWidth={5}/>}
+        showsUserLocation={false} rotateEnabled pitchEnabled showsCompass showsTraffic={navigating} moveOnMarkerPress={false}>
+        {polyline.length>0&&<Polyline coordinates={polyline} strokeColor="#4A90C4" strokeWidth={5} zIndex={1}/>}
+        {userLocation&&<Marker coordinate={userLocation} anchor={{x:0.5,y:0.5}} flat={true} rotation={userLocation.heading||0}><View style={{width:20,height:20,borderRadius:10,backgroundColor:'#4A90C4',borderWidth:3,borderColor:'#fff'}}/></Marker>}
         {places.map((p,i)=>p.geometry?.location&&(
           <Marker key={i} coordinate={{latitude:p.geometry.location.lat,longitude:p.geometry.location.lng}} title={p.name} pinColor={activeF.color}/>
         ))}

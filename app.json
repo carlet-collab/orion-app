@@ -25,6 +25,18 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "34d138cf-3c72-45fe-ac5a-8e915689ff7f"
+      }
+    },
+    "owner": "carlet",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/34d138cf-3c72-45fe-ac5a-8e915689ff7f"
     }
   }
 }
