@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, SafeAreaView } from 'react-native'
 import { GOOGLE_MAPS_KEY } from '../lib/maps'
+import AutocompleteInput from '../components/AutocompleteInput'
 import * as Location from 'expo-location'
 
 const C = { primary: '#1A1A1A', accent: '#7BA7BC', bg: '#FAFAFA', surface: '#FFFFFF', border: '#E8E8E8', hint: '#AEAEB2', secondary: '#6E6E73' }
@@ -66,7 +67,7 @@ export default function PlanScreen({ navigation }: any) {
             <TextInput value={origin} onChangeText={setOrigin} placeholder="Prague, Czech Republic" placeholderTextColor={C.hint} style={s.input} returnKeyType="next" autoCorrect={false} />
 
             <Text style={[s.label, { marginTop: 16 }]}>TO</Text>
-            <TextInput value={destination} onChangeText={setDestination} placeholder="Madrid, Spain" placeholderTextColor={C.hint} style={s.input} returnKeyType="done" autoCorrect={false} onSubmitEditing={handleSearch} />
+            <AutocompleteInput value={destination} onChangeText={setDestination} onSelect={setDestination} placeholder="Madrid, Spain" />
 
             <View style={s.toggle}>
               <View>
