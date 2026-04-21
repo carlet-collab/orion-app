@@ -1,5 +1,6 @@
-import React, { useState, useRef } from 'react'
+import React, { useState, useRef, useEffect } from 'react'
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator } from 'react-native'
+import * as Location from 'expo-location'
 import { GOOGLE_MAPS_KEY } from '../lib/maps'
 
 interface Props {
@@ -14,14 +15,36 @@ export default function AutocompleteInput({ value, onChangeText, onSelect, place
   const [loading, setLoading] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
   const debounceRef = useRef<any>(null)
+  const userLocRef = useRef<{lat: number, lng: number} | null>(null)
+
+  // Get user location on mount for bias
+  useEffect(() => {
+    Location.getForegroundPermissionsAsync().then(({ status }) => {
+      if (status === 'granted') {
+        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }).then(loc => {
+          userLocRef.current = { lat: loc.coords.latitude, lng: loc.coords.longitude }
+        }).catch(() => {})
+      }
+    })
+  }, [])
 
   const fetchSuggestions = async (text: string) => {
     if (text.length < 2) { setSuggestions([]); setShowSuggestions(false); return }
     setLoading(true)
     try {
-      const res = await fetch(`https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(text)}&types=geocode&key=${GOOGLE_MAPS_KEY}`)
+      const loc = userLocRef.current
+      // location bias: 50km radius around user if we have location
+      const locationParam = loc
+        ? `&location=${loc.lat},${loc.lng}&radius=50000&strictbounds=false`
+        : ''
+      const res = await fetch(
+        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(text)}&types=establishment%7Cgeocode${locationParam}&key=${GOOGLE_MAPS_KEY}`
+      )
       const data = await res.json()
-      if (data.predictions) { setSuggestions(data.predictions); setShowSuggestions(true) }
+      if (data.predictions) {
+        setSuggestions(data.predictions)
+        setShowSuggestions(true)
+      }
     } catch (e) { console.error(e) }
     setLoading(false)
   }
@@ -67,8 +90,12 @@ export default function AutocompleteInput({ value, onChangeText, onSelect, place
           {suggestions.map((item, i) => (
             <TouchableOpacity key={item.place_id} onPress={() => handleSelect(item)}
               style={[s.suggestion, i < suggestions.length - 1 && s.suggestionBorder]}>
-              <Text style={s.suggestionMain} numberOfLines={1}>{item.structured_formatting?.main_text || item.description}</Text>
-              <Text style={s.suggestionSub} numberOfLines={1}>{item.structured_formatting?.secondary_text || ''}</Text>
+              <Text style={s.suggestionMain} numberOfLines={1}>
+                {item.structured_formatting?.main_text || item.description}
+              </Text>
+              <Text style={s.suggestionSub} numberOfLines={1}>
+                {item.structured_formatting?.secondary_text || ''}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
