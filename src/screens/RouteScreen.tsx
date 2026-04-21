@@ -218,10 +218,10 @@ export default function RouteScreen({ route, navigation }: any) {
 
     // Rerouting — uses destinationRef so never stale
     const now = Date.now()
-    if (now - lastRerouteRef.current > 10000 && allCoords.length > 0) {
+    if (now - lastRerouteRef.current > 8000 && allCoords.length > 0) {
       const closestIdx = closestPolylineIndex(allCoords, latitude, longitude)
       const distToRoute = haversine(latitude, longitude, allCoords[closestIdx].latitude, allCoords[closestIdx].longitude)
-      if (distToRoute > 150) {
+      if (distToRoute > 80) {
         lastRerouteRef.current = now
         setRerouting(true)
         speak('Recalculating.')
@@ -349,7 +349,7 @@ export default function RouteScreen({ route, navigation }: any) {
       >
         {/* Driven portion — grey */}
         {drivenPolyline.length > 1 && (
-          <Polyline coordinates={drivenPolyline} strokeColor="#AEAEB2" strokeWidth={5} zIndex={1} />
+          <Polyline coordinates={drivenPolyline} strokeColor="#333333" strokeWidth={5} zIndex={1} />
         )}
         {/* Remaining route — blue */}
         {polyline.length > 0 && (
@@ -357,7 +357,7 @@ export default function RouteScreen({ route, navigation }: any) {
             coordinates={drivenPolyline.length > 1
               ? polyline.slice(drivenIdxRef.current)
               : polyline}
-            strokeColor="#4A90C4"
+            strokeColor="#007AFF"
             strokeWidth={5}
             zIndex={2}
           />
