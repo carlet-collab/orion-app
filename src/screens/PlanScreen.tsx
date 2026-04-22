@@ -64,10 +64,10 @@ export default function PlanScreen({ navigation }: any) {
                 <Text style={{fontSize:11,fontWeight:'600',color:'#7BA7BC'}}>Use my location</Text>
               </TouchableOpacity>
             </View>
-            <AutocompleteInput value={origin} onChangeText={setOrigin} onSelect={setOrigin} placeholder="Prague, Czech Republic" />
+            <AutocompleteInput value={origin} onChangeText={setOrigin} onSelect={setOrigin} placeholder="Prague, Czech Republic" mode="local" />
 
             <Text style={[s.label, { marginTop: 16 }]}>TO</Text>
-            <AutocompleteInput value={destination} onChangeText={setDestination} onSelect={setDestination} placeholder="Madrid, Spain" />
+            <AutocompleteInput value={destination} onChangeText={setDestination} onSelect={setDestination} placeholder="Madrid, Spain" mode="city" />
 
             <View style={s.toggle}>
               <View>
