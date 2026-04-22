@@ -69,7 +69,7 @@ export default function RouteScreen({ route, navigation }: any) {
   const currentSteps = planByDay && stages.length > 0 ? (stages[activeDay]?.steps || []) : steps
   const activeF = FILTERS.find(f => f.key === activeFilter)!
 
-  useEffect(() => { fetchRoute(origin, destination, false) }, [])
+  useEffect(() => { fetchRouteRef.current = fetchRoute; fetchRoute(origin, destination, false) }, [])
   useEffect(() => { if (routeInfo) fetchPlaces(null) }, [activeFilter, activeDay, routeInfo])
   useEffect(() => { return () => { locationSubRef.current?.remove(); Speech.stop() } }, [])
 
@@ -132,6 +132,7 @@ export default function RouteScreen({ route, navigation }: any) {
   }
 
   const fetchRoute = async (from: string, to: string, isReroute: boolean) => {
+    fetchRouteRef.current = fetchRoute
     if (!isReroute) setLoading(true)
     try {
       const res = await fetch(getDirectionsUrl(from, to))
@@ -222,15 +223,17 @@ export default function RouteScreen({ route, navigation }: any) {
 
     // Rerouting — uses destinationRef so never stale
     const now = Date.now()
-    if (now - lastRerouteRef.current > 8000 && allCoords.length > 0) {
+    if (now - lastRerouteRef.current > 6000 && allCoords.length > 0) {
       const closestIdx = closestPolylineIndex(allCoords, latitude, longitude)
       const distToRoute = haversine(latitude, longitude, allCoords[closestIdx].latitude, allCoords[closestIdx].longitude)
-      if (distToRoute > 80) {
+      if (distToRoute > 60) {
         lastRerouteRef.current = now
         setRerouting(true)
         speak('Recalculating.')
-        fetchRoute(`${latitude},${longitude}`, destinationRef.current, true)
-          .then(() => setRerouting(false))
+        const rerouteFrom = `${latitude},${longitude}`
+        const rerouteTo = destinationRef.current
+        ;(fetchRouteRef.current || fetchRoute)(rerouteFrom, rerouteTo, true)
+          .finally(() => setRerouting(false))
       }
     }
 
@@ -370,7 +373,7 @@ export default function RouteScreen({ route, navigation }: any) {
         {polyline.length > 0 && (
           <Polyline
             coordinates={drivenPolyline.length > 1
-              ? polyline.slice(drivenIdxRef.current)
+              ? polyline.slice(drivenPolyline.length - 1)
               : polyline}
             strokeColor="#007AFF"
             strokeWidth={5}
