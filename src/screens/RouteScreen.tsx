@@ -6,6 +6,7 @@ import * as Speech from 'expo-speech'
 import { useKeepAwake } from 'expo-keep-awake'
 import { getDirectionsUrl, getPlacesUrl, haversine, decodePolyline, stripHtml, FILTERS } from '../lib/maps'
 import { track, saveRoute, getSessionId } from '../lib/tracking'
+import SaveRouteModal from '../components/SaveRouteModal'
 
 const C = { primary: '#1A1A1A', accent: '#7BA7BC', bg: '#FAFAFA', surface: '#FFFFFF', border: '#E8E8E8', hint: '#AEAEB2', secondary: '#6E6E73' }
 const { width: W } = Dimensions.get('window')
@@ -58,6 +59,7 @@ export default function RouteScreen({ route, navigation }: any) {
   const [userLocation, setUserLocation] = useState<any>(null)
   const [currentStep, setCurrentStep] = useState(0)
   const [voiceEnabled, setVoiceEnabled] = useState(true)
+  const [showSaveModal, setShowSaveModal] = useState(false)
 
   // Keep refs in sync with state
   useEffect(() => { voiceEnabledRef.current = voiceEnabled }, [voiceEnabled])
@@ -411,13 +413,7 @@ export default function RouteScreen({ route, navigation }: any) {
               style={[s.navMainBtn, { backgroundColor: '#F5F5F7', paddingHorizontal: 16 }]}>
               <Text style={[s.navMainBtnTxt, { color: '#6E6E73' }]}>← NEW</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={async () => {
-              const info = routeInfoRef.current || routeInfo
-              if (!info) return
-              const ok = await saveRoute({ origin, destination, distance_text: info.distance, duration_text: info.duration, total_m: info.totalM, plan_by_day: planByDay, limit_type: limitType, limit_value: limitValue })
-              track('route_saved', { origin, destination })
-              alert(ok ? '✅ Route saved!' : '❌ Could not save route.')
-            }} style={[s.navMainBtn, { backgroundColor: '#7BA7BC', paddingHorizontal: 16, marginTop: 0 }]}>
+            <TouchableOpacity onPress={() => setShowSaveModal(true)} style={[s.navMainBtn, { backgroundColor: '#7BA7BC', paddingHorizontal: 16, marginTop: 0 }]}>
               <Text style={s.navMainBtnTxt}>💾 SAVE</Text>
             </TouchableOpacity>
           </View>
@@ -500,6 +496,23 @@ export default function RouteScreen({ route, navigation }: any) {
         </View>
 
       </ScrollView>
+      {routeInfo && (
+        <SaveRouteModal
+          visible={showSaveModal}
+          onClose={() => setShowSaveModal(false)}
+          onSaved={() => { track('route_saved', { origin, destination }); alert('✅ Route saved!') }}
+          routeParams={{
+            origin,
+            destination,
+            distance_text: routeInfo.distance,
+            duration_text: routeInfo.duration,
+            total_m: routeInfo.totalM,
+            plan_by_day: planByDay,
+            limit_type: limitType,
+            limit_value: limitValue,
+          }}
+        />
+      )}
     </View>
   )
 }
