@@ -295,6 +295,15 @@ export default function RouteScreen({ route, navigation }: any) {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
 
+      {/* Sticky STOP button — always visible during navigation */}
+      {navigating && (
+        <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, zIndex: 999, padding: 16, backgroundColor: 'rgba(255,255,255,0.95)', borderTopWidth: 1, borderTopColor: '#E8E8E8' }}>
+          <TouchableOpacity onPress={stopNavigation} style={{ backgroundColor: '#C97B7B', borderRadius: 12, padding: 16, alignItems: 'center' }}>
+            <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700', letterSpacing: 2 }}>⏹ STOP NAVIGATION</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {/* Navigation banner */}
       {navigating && (
         <SafeAreaView style={{ backgroundColor: rerouting ? '#C97B7B' : '#1A1A1A' }}>
@@ -394,9 +403,9 @@ export default function RouteScreen({ route, navigation }: any) {
               style={[s.navMainBtn, { flex: 1, backgroundColor: navigating ? '#C97B7B' : C.primary }]}>
               <Text style={s.navMainBtnTxt}>{navigating ? '⏹ STOP' : '🧭 NAVIGATE'}</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => navigation.goBack()}
+            <TouchableOpacity onPress={() => { if (navigating) stopNavigation(); navigation.goBack(); }}
               style={[s.navMainBtn, { backgroundColor: '#F5F5F7', paddingHorizontal: 16 }]}>
-              <Text style={[s.navMainBtnTxt, { color: '#6E6E73' }]}>+ NEW</Text>
+              <Text style={[s.navMainBtnTxt, { color: '#6E6E73' }]}>← NEW</Text>
             </TouchableOpacity>
           </View>
           <View style={s.stats}>
