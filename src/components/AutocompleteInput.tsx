@@ -8,22 +8,21 @@ interface Props {
   onChangeText: (text: string) => void
   onSelect: (address: string) => void
   placeholder: string
-  mode?: 'city' | 'local' // city = global cities, local = nearby places
 }
 
-export default function AutocompleteInput({ value, onChangeText, onSelect, placeholder, mode = 'city' }: Props) {
+export default function AutocompleteInput({ value, onChangeText, onSelect, placeholder }: Props) {
   const [suggestions, setSuggestions] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [showSuggestions, setShowSuggestions] = useState(false)
   const debounceRef = useRef<any>(null)
-  const userLocRef = useRef<{lat: number, lng: number} | null>(null)
+  const userLocRef = useRef<{ lat: number, lng: number } | null>(null)
 
   useEffect(() => {
     Location.getForegroundPermissionsAsync().then(({ status }) => {
       if (status === 'granted') {
-        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }).then(loc => {
-          userLocRef.current = { lat: loc.coords.latitude, lng: loc.coords.longitude }
-        }).catch(() => {})
+        Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced })
+          .then(loc => { userLocRef.current = { lat: loc.coords.latitude, lng: loc.coords.longitude } })
+          .catch(() => {})
       }
     })
   }, [])
@@ -33,17 +32,10 @@ export default function AutocompleteInput({ value, onChangeText, onSelect, place
     setLoading(true)
     try {
       const loc = userLocRef.current
-      let url = ''
-
-      if (mode === 'city') {
-        // Global city search — no location bias, cities only
-        url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(text)}&types=(cities)&key=${GOOGLE_MAPS_KEY}&language=en`
-      } else {
-        // Local mode — nearby businesses and addresses
-        const locationParam = loc ? `&location=${loc.lat},${loc.lng}&radius=50000` : ''
-        url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(text)}&types=establishment|geocode${locationParam}&key=${GOOGLE_MAPS_KEY}&language=en`
-      }
-
+      // Soft bias toward user location — 500km radius — does NOT restrict results globally
+      // geocode type covers: streets, cities, countries, addresses — everything
+      const locationParam = loc ? `&location=${loc.lat},${loc.lng}&radius=500000` : ''
+      const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(text)}&types=geocode${locationParam}&key=${GOOGLE_MAPS_KEY}&language=en`
       const res = await fetch(url)
       const data = await res.json()
       setSuggestions(data.predictions || [])
@@ -66,7 +58,7 @@ export default function AutocompleteInput({ value, onChangeText, onSelect, place
   }
 
   return (
-    <View style={s.wrapper}>
+    <View>
       <View style={s.inputRow}>
         <TextInput
           value={value}
@@ -108,7 +100,6 @@ export default function AutocompleteInput({ value, onChangeText, onSelect, place
 }
 
 const s = StyleSheet.create({
-  wrapper: { marginBottom: 0 },
   inputRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F5F7', borderRadius: 10, borderWidth: 1, borderColor: '#E8E8E8' },
   input: { flex: 1, padding: 13, fontSize: 14, color: '#1A1A1A' },
   clear: { paddingHorizontal: 12, paddingVertical: 13 },
