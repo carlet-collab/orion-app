@@ -105,13 +105,13 @@ export default function AutocompleteInput({ value, onChangeText, onSelect, place
 }
 
 const s = StyleSheet.create({
-  container: { position: 'relative', zIndex: 10 },
+  container: { position: 'relative', zIndex: 999 },
   inputRow: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F5F5F7', borderRadius: 10, borderWidth: 1, borderColor: '#E8E8E8' },
   input: { flex: 1, padding: 13, fontSize: 14, color: '#1A1A1A' },
   spinner: { paddingRight: 10 },
   clear: { paddingHorizontal: 12, paddingVertical: 13 },
   clearTxt: { fontSize: 12, color: '#AEAEB2', fontWeight: '600' },
-  dropdown: { position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: '#E8E8E8', marginTop: 4, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 8, zIndex: 999 },
+  dropdown: { position: 'absolute', top: '100%', left: 0, right: 0, backgroundColor: '#fff', borderRadius: 10, borderWidth: 1, borderColor: '#E8E8E8', marginTop: 4, shadowColor: '#000', shadowOpacity: 0.15, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 20, zIndex: 9999 },
   suggestion: { paddingHorizontal: 14, paddingVertical: 12 },
   suggestionBorder: { borderBottomWidth: 1, borderBottomColor: '#F5F5F7' },
   suggestionMain: { fontSize: 13, fontWeight: '600', color: '#1A1A1A', marginBottom: 2 },

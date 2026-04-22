@@ -39,7 +39,7 @@ export default function PlanScreen({ navigation }: any) {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: C.bg }}>
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={s.content} keyboardShouldPersistTaps="handled" style={{ overflow: 'visible' }}>
 
           <View style={s.header}>
             <View style={s.logoRow}>
@@ -131,7 +131,7 @@ const s = StyleSheet.create({
   tagline: { fontSize: 11, color: '#AEAEB2', fontStyle: 'italic', marginLeft: 36 },
   title: { fontSize: 30, fontWeight: '300', color: '#1A1A1A', lineHeight: 38, marginBottom: 12 },
   subtitle: { fontSize: 14, color: '#6E6E73', lineHeight: 22, marginBottom: 28 },
-  card: { backgroundColor: '#fff', borderRadius: 20, padding: 22, borderWidth: 1, borderColor: '#E8E8E8', marginBottom: 28 },
+  card: { backgroundColor: '#fff', borderRadius: 20, padding: 22, borderWidth: 1, borderColor: '#E8E8E8', marginBottom: 28, zIndex: 100, overflow: 'visible' },
   label: { fontSize: 10, fontWeight: '600', color: '#AEAEB2', letterSpacing: 2, marginBottom: 8 },
   input: { backgroundColor: '#F5F5F7', borderRadius: 10, padding: 13, fontSize: 14, color: '#1A1A1A', borderWidth: 1, borderColor: '#E8E8E8' },
   toggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F5F5F7', borderRadius: 12, padding: 14, marginTop: 18 },
