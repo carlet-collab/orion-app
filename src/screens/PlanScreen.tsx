@@ -64,7 +64,7 @@ export default function PlanScreen({ navigation }: any) {
                 <Text style={{fontSize:11,fontWeight:'600',color:'#7BA7BC'}}>Use my location</Text>
               </TouchableOpacity>
             </View>
-            <TextInput value={origin} onChangeText={setOrigin} placeholder="Prague, Czech Republic" placeholderTextColor={C.hint} style={s.input} returnKeyType="next" autoCorrect={false} />
+            <AutocompleteInput value={origin} onChangeText={setOrigin} onSelect={setOrigin} placeholder="Prague, Czech Republic" />
 
             <Text style={[s.label, { marginTop: 16 }]}>TO</Text>
             <AutocompleteInput value={destination} onChangeText={setDestination} onSelect={setDestination} placeholder="Madrid, Spain" />
@@ -101,6 +101,9 @@ export default function PlanScreen({ navigation }: any) {
 
             <TouchableOpacity onPress={handleSearch} disabled={loading} style={[s.searchBtn, { opacity: loading ? 0.5 : 1 }]}>
               {loading ? <ActivityIndicator color="#fff" /> : <Text style={s.searchBtnTxt}>DISCOVER THE ROUTE</Text>}
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.navigate('MyRoutes')} style={s.myRoutesBtn}>
+              <Text style={s.myRoutesBtnTxt}>🗺 My saved routes</Text>
             </TouchableOpacity>
           </View>
 
@@ -147,6 +150,8 @@ const s = StyleSheet.create({
   error: { color: '#C97B7B', fontSize: 12, marginTop: 12 },
   searchBtn: { backgroundColor: '#1A1A1A', borderRadius: 12, padding: 16, alignItems: 'center', marginTop: 20 },
   searchBtnTxt: { color: '#fff', fontSize: 12, fontWeight: '700', letterSpacing: 2 },
+  myRoutesBtn: { borderRadius: 12, padding: 13, alignItems: 'center', marginTop: 10, borderWidth: 1, borderColor: '#E8E8E8' },
+  myRoutesBtnTxt: { color: '#6E6E73', fontSize: 12, fontWeight: '600' },
   icons: { flexDirection: 'row', justifyContent: 'space-around' },
   iconItem: { alignItems: 'center', gap: 8 },
   iconBox: { width: 52, height: 52, borderRadius: 14, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
