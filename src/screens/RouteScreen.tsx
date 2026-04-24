@@ -7,6 +7,7 @@ import { useKeepAwake } from 'expo-keep-awake'
 import { getDirectionsUrl, getPlacesUrl, haversine, decodePolyline, stripHtml, FILTERS } from '../lib/maps'
 import { track, saveRoute } from '../lib/tracking'
 import { registerForPushNotifications } from '../lib/notifications'
+import { generateTripCode, updateLivePosition, deleteLiveTrip } from '../lib/livetrip'
 import RatingModal from '../components/RatingModal'
 import ShareCard from '../components/ShareCard'
 import * as Sharing from 'expo-sharing'
@@ -44,6 +45,7 @@ export default function RouteScreen({ route, navigation }: any) {
   const destinationRef = useRef(destination)
   const activeFilterRef = useRef('lodging')
   const drivenIdxRef = useRef(0)
+  const tripCodeRef = useRef<string>('')
 
   // React state for UI rendering only
   const [routeInfo, setRouteInfo] = useState<any>(null)
@@ -246,6 +248,12 @@ export default function RouteScreen({ route, navigation }: any) {
       }
     }
 
+    // Update live position every 15 seconds
+    const nowLive = Date.now()
+    if (tripCodeRef.current && (nowLive % 15000 < 1500)) {
+      updateLivePosition(tripCodeRef.current, origin, destinationRef.current, latitude, longitude, heading || 0)
+    }
+
     // Refresh places every 2km
     const last = lastFetchRef.current
     if (!last || haversine(latitude, longitude, last.latitude, last.longitude) > 2000) {
@@ -284,7 +292,10 @@ export default function RouteScreen({ route, navigation }: any) {
     navigatingRef.current = false
     setNavigating(false)
     Speech.stop()
-    // Show rating modal if user drove more than 1km
+    if (tripCodeRef.current) {
+      deleteLiveTrip(tripCodeRef.current)
+      tripCodeRef.current = ''
+    }
     if (drivenIdxRef.current > 10) setShowRating(true)
     locationSubRef.current?.remove()
     locationSubRef.current = null
@@ -554,6 +565,7 @@ export default function RouteScreen({ route, navigation }: any) {
         hotelCount={places.filter((p: any) => p.types?.includes('lodging')).length || undefined}
         diningCount={places.filter((p: any) => p.types?.includes('restaurant') || p.types?.includes('food')).length || undefined}
         sightsCount={places.filter((p: any) => p.types?.includes('tourist_attraction') || p.types?.includes('museum')).length || undefined}
+        tripCode={tripCodeRef.current || undefined}
       />
     </View>
   )

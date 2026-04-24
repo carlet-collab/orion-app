@@ -13,16 +13,18 @@ interface Props {
   hotelCount?: number
   diningCount?: number
   sightsCount?: number
+  tripCode?: string
 }
 
-export default function ShareCard({ visible, onClose, origin, destination, distance, duration, days, hotelCount, diningCount, sightsCount }: Props) {
+export default function ShareCard({ visible, onClose, origin, destination, distance, duration, days, hotelCount, diningCount, sightsCount, tripCode }: Props) {
   const originCity = origin.split(',')[0]
   const destCity = destination.split(',')[0]
 
   const handleShare = async () => {
     const encodedFrom = encodeURIComponent(origin)
     const encodedTo = encodeURIComponent(destination)
-    const webLink = `https://oriontravel.app/trip?from=${encodedFrom}&to=${encodedTo}`
+    const codeParam = tripCode ? `&code=${tripCode}` : ''
+    const webLink = `https://oriontravel.app/trip?from=${encodedFrom}&to=${encodedTo}${codeParam}`
     const message =
       `🧭 ${originCity} → ${destCity}\n` +
       `${distance} · ${duration}${days && days > 1 ? ` · ${days} days` : ''}\n\n` +
