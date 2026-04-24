@@ -20,11 +20,15 @@ export default function ShareCard({ visible, onClose, origin, destination, dista
   const destCity = destination.split(',')[0]
 
   const handleShare = async () => {
+    const encodedFrom = encodeURIComponent(origin)
+    const encodedTo = encodeURIComponent(destination)
+    const webLink = `https://oriontravel.app/plan?from=${encodedFrom}&to=${encodedTo}`
     const message =
       `🧭 ${originCity} → ${destCity}\n` +
       `${distance} · ${duration}${days && days > 1 ? ` · ${days} days` : ''}\n\n` +
-      `${hotelCount ? `🏨 ${hotelCount} hotels` : '🏨 Hotels'} · ${diningCount ? `🍽️ ${diningCount} restaurants` : '🍽️ Restaurants'} · ${sightsCount ? `🎭 ${sightsCount} sights` : '🎭 Sights'} found along the route\n\n` +
-      `Planned on Orion — oriontravel.app`
+      `${hotelCount ? `🏨 ${hotelCount} hotels` : '🏨 Hotels'} · ${diningCount ? `🍽️ ${diningCount} restaurants` : '🍽️ Restaurants'} · ${sightsCount ? `🎭 ${sightsCount} sights` : '🎭 Sights'} found along the route.\n\n` +
+      `👉 Open this route in Orion:\n${webLink}\n\n` +
+      `Orion finds hotels, restaurants and attractions along your exact driving route. Free at oriontravel.app`
     try {
       await Share.share({ message, title: `${originCity} → ${destCity} on Orion` })
     } catch (e) {
