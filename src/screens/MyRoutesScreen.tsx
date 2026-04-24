@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, Alert, SafeAreaView } from 'react-native'
 import { supabase } from '../lib/supabase'
 import { getSessionId } from '../lib/tracking'
+import { getSessionId } from '../lib/tracking'
 
 const C = { primary: '#1A1A1A', accent: '#7BA7BC', bg: '#FAFAFA', surface: '#FFFFFF', border: '#E8E8E8', hint: '#AEAEB2', secondary: '#6E6E73' }
 
@@ -32,6 +33,32 @@ export default function MyRoutesScreen({ navigation }: any) {
         setRoutes(r => r.filter(r => r.id !== id))
       }}
     ])
+  }
+
+  const deleteAllData = () => {
+    Alert.alert(
+      'Delete all my data',
+      'This will permanently delete all your saved routes and usage data from Orion. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Everything',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const session_id = getSessionId()
+              await supabase.from('user_routes').delete().eq('session_id', session_id)
+              await supabase.from('orion_events').delete().eq('session_id', session_id)
+              await supabase.from('orion_users').delete().eq('session_id', session_id)
+              setRoutes([])
+              Alert.alert('Done', 'All your data has been deleted from Orion.')
+            } catch (e) {
+              Alert.alert('Error', 'Could not delete data. Please try again.')
+            }
+          }
+        }
+      ]
+    )
   }
 
   const openRoute = (r: any) => {
@@ -111,6 +138,15 @@ export default function MyRoutesScreen({ navigation }: any) {
           )}
         />
       )}
+      {/* GDPR — Delete all data */}
+      <View style={{ padding: 16, borderTopWidth: 1, borderTopColor: '#E8E8E8' }}>
+        <TouchableOpacity onPress={deleteAllData} style={{ padding: 14, alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: '#C97B7B' }}>
+          <Text style={{ fontSize: 12, fontWeight: '600', color: '#C97B7B', letterSpacing: 1 }}>🗑 DELETE ALL MY DATA</Text>
+        </TouchableOpacity>
+        <Text style={{ fontSize: 10, color: '#AEAEB2', textAlign: 'center', marginTop: 8, lineHeight: 14 }}>
+          Permanently deletes all your saved routes and usage data from Orion. Required under GDPR.
+        </Text>
+      </View>
     </SafeAreaView>
   )
 }
