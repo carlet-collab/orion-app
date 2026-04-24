@@ -8,7 +8,6 @@ import { getDirectionsUrl, getPlacesUrl, haversine, decodePolyline, stripHtml, F
 import { track, saveRoute } from '../lib/tracking'
 import { registerForPushNotifications } from '../lib/notifications'
 import * as Sharing from 'expo-sharing'
-import { track, saveRoute } from '../lib/tracking'
 
 const C = { primary: '#1A1A1A', accent: '#7BA7BC', bg: '#FAFAFA', surface: '#FFFFFF', border: '#E8E8E8', hint: '#AEAEB2', secondary: '#6E6E73' }
 const { width: W } = Dimensions.get('window')
