@@ -7,6 +7,7 @@ import { useKeepAwake } from 'expo-keep-awake'
 import { getDirectionsUrl, getPlacesUrl, haversine, decodePolyline, stripHtml, FILTERS } from '../lib/maps'
 import { track, saveRoute } from '../lib/tracking'
 import { registerForPushNotifications } from '../lib/notifications'
+import RatingModal from '../components/RatingModal'
 import * as Sharing from 'expo-sharing'
 
 const C = { primary: '#1A1A1A', accent: '#7BA7BC', bg: '#FAFAFA', surface: '#FFFFFF', border: '#E8E8E8', hint: '#AEAEB2', secondary: '#6E6E73' }
@@ -62,6 +63,7 @@ export default function RouteScreen({ route, navigation }: any) {
   const [currentStep, setCurrentStep] = useState(0)
   const [voiceEnabled, setVoiceEnabled] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [showRating, setShowRating] = useState(false)
 
   // Keep refs in sync with state
   useEffect(() => { voiceEnabledRef.current = voiceEnabled }, [voiceEnabled])
@@ -288,6 +290,8 @@ export default function RouteScreen({ route, navigation }: any) {
     navigatingRef.current = false
     setNavigating(false)
     Speech.stop()
+    // Show rating modal if user drove more than 1km
+    if (drivenIdxRef.current > 10) setShowRating(true)
     locationSubRef.current?.remove()
     locationSubRef.current = null
     setDrivenPolyline([])
