@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react'
 import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, Alert, SafeAreaView } from 'react-native'
 import { supabase } from '../lib/supabase'
 import { getSessionId } from '../lib/tracking'
-import { getSessionId } from '../lib/tracking'
 
 const C = { primary: '#1A1A1A', accent: '#7BA7BC', bg: '#FAFAFA', surface: '#FFFFFF', border: '#E8E8E8', hint: '#AEAEB2', secondary: '#6E6E73' }
 
