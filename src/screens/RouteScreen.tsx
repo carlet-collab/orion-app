@@ -535,6 +535,23 @@ export default function RouteScreen({ route, navigation }: any) {
         </View>
 
       </ScrollView>
+      <RatingModal
+        visible={showRating}
+        onClose={() => setShowRating(false)}
+        origin={origin}
+        destination={destination}
+        distanceKm={Math.round((routeInfoRef.current?.totalM || 0) / 1000)}
+        durationMin={currentStepRef.current}
+      />
+      <ShareCard
+        visible={showShareCard}
+        onClose={() => setShowShareCard(false)}
+        origin={origin}
+        destination={destination}
+        distance={routeInfo?.distance || ''}
+        duration={routeInfo?.duration || ''}
+        days={planByDay ? limitValue : undefined}
+      />
     </View>
   )
 }
