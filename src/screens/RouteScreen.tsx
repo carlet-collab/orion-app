@@ -5,8 +5,6 @@ import * as Location from 'expo-location'
 import * as Speech from 'expo-speech'
 import { useKeepAwake } from 'expo-keep-awake'
 import { getDirectionsUrl, getPlacesUrl, haversine, decodePolyline, stripHtml, FILTERS } from '../lib/maps'
-import { track, saveRoute, getSessionId } from '../lib/tracking'
-import SaveRouteModal from '../components/SaveRouteModal'
 
 const C = { primary: '#1A1A1A', accent: '#7BA7BC', bg: '#FAFAFA', surface: '#FFFFFF', border: '#E8E8E8', hint: '#AEAEB2', secondary: '#6E6E73' }
 const { width: W } = Dimensions.get('window')
@@ -59,7 +57,6 @@ export default function RouteScreen({ route, navigation }: any) {
   const [userLocation, setUserLocation] = useState<any>(null)
   const [currentStep, setCurrentStep] = useState(0)
   const [voiceEnabled, setVoiceEnabled] = useState(true)
-  const [showSaveModal, setShowSaveModal] = useState(false)
 
   // Keep refs in sync with state
   useEffect(() => { voiceEnabledRef.current = voiceEnabled }, [voiceEnabled])
@@ -69,7 +66,7 @@ export default function RouteScreen({ route, navigation }: any) {
   const currentSteps = planByDay && stages.length > 0 ? (stages[activeDay]?.steps || []) : steps
   const activeF = FILTERS.find(f => f.key === activeFilter)!
 
-  useEffect(() => { fetchRouteRef.current = fetchRoute; fetchRoute(origin, destination, false) }, [])
+  useEffect(() => { fetchRoute(origin, destination, false) }, [])
   useEffect(() => { if (routeInfo) fetchPlaces(null) }, [activeFilter, activeDay, routeInfo])
   useEffect(() => { return () => { locationSubRef.current?.remove(); Speech.stop() } }, [])
 
@@ -132,14 +129,12 @@ export default function RouteScreen({ route, navigation }: any) {
   }
 
   const fetchRoute = async (from: string, to: string, isReroute: boolean) => {
-    fetchRouteRef.current = fetchRoute
     if (!isReroute) setLoading(true)
     try {
       const res = await fetch(getDirectionsUrl(from, to))
       const data = await res.json()
       if (data.status === 'OK' && data.routes?.[0]) {
         processRouteData(data, isReroute)
-        if (!isReroute) track('route_calculated', { origin: from, destination: to, distance_km: Math.round((data.routes[0].legs[0].distance.value||0)/1000), duration_min: Math.round((data.routes[0].legs[0].duration.value||0)/60) })
       } else {
         if (!isReroute) setError('Could not get route.')
       }
@@ -223,17 +218,15 @@ export default function RouteScreen({ route, navigation }: any) {
 
     // Rerouting — uses destinationRef so never stale
     const now = Date.now()
-    if (now - lastRerouteRef.current > 6000 && allCoords.length > 0) {
+    if (now - lastRerouteRef.current > 8000 && allCoords.length > 0) {
       const closestIdx = closestPolylineIndex(allCoords, latitude, longitude)
       const distToRoute = haversine(latitude, longitude, allCoords[closestIdx].latitude, allCoords[closestIdx].longitude)
-      if (distToRoute > 60) {
+      if (distToRoute > 80) {
         lastRerouteRef.current = now
         setRerouting(true)
         speak('Recalculating.')
-        const rerouteFrom = `${latitude},${longitude}`
-        const rerouteTo = destinationRef.current
-        ;(fetchRouteRef.current || fetchRoute)(rerouteFrom, rerouteTo, true)
-          .finally(() => setRerouting(false))
+        fetchRoute(`${latitude},${longitude}`, destinationRef.current, true)
+          .then(() => setRerouting(false))
       }
     }
 
@@ -249,7 +242,6 @@ export default function RouteScreen({ route, navigation }: any) {
     const { status } = await Location.requestForegroundPermissionsAsync()
     if (status !== 'granted') { alert('Location permission needed for navigation'); return }
     navigatingRef.current = true
-    track('navigation_started', { origin, destination })
     drivenIdxRef.current = 0
     setNavigating(true)
     setCurrentStep(0)
@@ -270,7 +262,6 @@ export default function RouteScreen({ route, navigation }: any) {
     navigatingRef.current = false
     setNavigating(false)
     Speech.stop()
-    track('navigation_stopped', { origin, destination, steps_completed: currentStepRef.current, reroutes: lastRerouteRef.current > 0 ? 1 : 0 })
     locationSubRef.current?.remove()
     locationSubRef.current = null
     setDrivenPolyline([])
@@ -373,7 +364,7 @@ export default function RouteScreen({ route, navigation }: any) {
         {polyline.length > 0 && (
           <Polyline
             coordinates={drivenPolyline.length > 1
-              ? polyline.slice(drivenPolyline.length - 1)
+              ? polyline.slice(drivenIdxRef.current)
               : polyline}
             strokeColor="#007AFF"
             strokeWidth={5}
@@ -415,9 +406,6 @@ export default function RouteScreen({ route, navigation }: any) {
             <TouchableOpacity onPress={() => { if (navigating) stopNavigation(); navigation.goBack(); }}
               style={[s.navMainBtn, { backgroundColor: '#F5F5F7', paddingHorizontal: 16 }]}>
               <Text style={[s.navMainBtnTxt, { color: '#6E6E73' }]}>← NEW</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShowSaveModal(true)} style={[s.navMainBtn, { backgroundColor: '#7BA7BC', paddingHorizontal: 16, marginTop: 0 }]}>
-              <Text style={s.navMainBtnTxt}>💾 SAVE</Text>
             </TouchableOpacity>
           </View>
           <View style={s.stats}>
@@ -464,7 +452,7 @@ export default function RouteScreen({ route, navigation }: any) {
           <Text style={s.sectionTitle}>{navigating ? '📍 PLACES AHEAD' : 'DISCOVER ALONG ROUTE'}</Text>
           <View style={s.filterRow}>
             {FILTERS.map(f => (
-              <TouchableOpacity key={f.key} onPress={() => { setActiveFilter(f.key); track('filter_changed', { filter: f.key, origin, destination }) }}
+              <TouchableOpacity key={f.key} onPress={() => setActiveFilter(f.key)}
                 style={[s.filterBtn, { backgroundColor: activeFilter === f.key ? f.color + '20' : C.surface, borderColor: activeFilter === f.key ? f.color + '80' : C.border }]}>
                 <Text style={{ fontSize: 20, marginBottom: 4 }}>{f.icon}</Text>
                 <Text style={[s.filterLabel, { color: activeFilter === f.key ? f.color : C.secondary }]}>{f.label.toUpperCase()}</Text>
@@ -490,7 +478,7 @@ export default function RouteScreen({ route, navigation }: any) {
                     <Text style={s.ratingTxt}>{p.rating}</Text>
                   </View>
                 )}
-                <TouchableOpacity onPress={() => { track('book_now_tapped', { place_name: p.name, place_type: activeFilter, origin, destination }); Linking.openURL(activeF.bookUrl(p.name, p.vicinity || '')) }}
+                <TouchableOpacity onPress={() => Linking.openURL(activeF.bookUrl(p.name, p.vicinity || ''))}
                   style={[s.bookBtn, { backgroundColor: activeF.color }]}>
                   <Text style={s.bookBtnTxt}>{activeFilter === 'lodging' ? 'BOOK HOTEL' : activeFilter === 'restaurant' ? 'RESERVE TABLE' : activeFilter === 'tourist_attraction' ? 'BOOK TICKETS' : 'BOOK TOUR'}</Text>
                 </TouchableOpacity>
@@ -499,23 +487,6 @@ export default function RouteScreen({ route, navigation }: any) {
         </View>
 
       </ScrollView>
-      {routeInfo && (
-        <SaveRouteModal
-          visible={showSaveModal}
-          onClose={() => setShowSaveModal(false)}
-          onSaved={() => { track('route_saved', { origin, destination }); alert('✅ Route saved!') }}
-          routeParams={{
-            origin,
-            destination,
-            distance_text: routeInfo.distance,
-            duration_text: routeInfo.duration,
-            total_m: routeInfo.totalM,
-            plan_by_day: planByDay,
-            limit_type: limitType,
-            limit_value: limitValue,
-          }}
-        />
-      )}
     </View>
   )
 }
