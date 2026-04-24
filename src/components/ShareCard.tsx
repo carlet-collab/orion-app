@@ -22,7 +22,7 @@ export default function ShareCard({ visible, onClose, origin, destination, dista
   const handleShare = async () => {
     const encodedFrom = encodeURIComponent(origin)
     const encodedTo = encodeURIComponent(destination)
-    const webLink = `https://oriontravel.app/plan?from=${encodedFrom}&to=${encodedTo}`
+    const webLink = `https://oriontravel.app/trip?from=${encodedFrom}&to=${encodedTo}`
     const message =
       `🧭 ${originCity} → ${destCity}\n` +
       `${distance} · ${duration}${days && days > 1 ? ` · ${days} days` : ''}\n\n` +
