@@ -47,6 +47,7 @@ export default function RouteScreen({ route, navigation }: any) {
   const [stages, setStages] = useState<any[]>([])
   const [polyline, setPolyline] = useState<any[]>([])
   const [drivenPolyline, setDrivenPolyline] = useState<any[]>([])
+  const [remainingPolyline, setRemainingPolyline] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [rerouting, setRerouting] = useState(false)
@@ -86,6 +87,7 @@ export default function RouteScreen({ route, navigation }: any) {
     polylineRef.current = coords
     setPolyline([...coords])
     setDrivenPolyline([])
+    setRemainingPolyline([...coords])
     drivenIdxRef.current = 0
 
     const totalSec = leg.duration.value
@@ -189,16 +191,19 @@ export default function RouteScreen({ route, navigation }: any) {
         heading: heading || 0,
         pitch: 50,
         zoom: 17
-      }, { duration: 600 })
+      }, { duration: 300 })
     }
 
-    // Update driven polyline using ref index — no stale state
+    // Update driven + remaining polyline together — both in state so both re-render
     const allCoords = polylineRef.current
     if (allCoords.length > 0) {
       const closestIdx = closestPolylineIndex(allCoords, latitude, longitude)
       if (closestIdx > drivenIdxRef.current) {
         drivenIdxRef.current = closestIdx
-        setDrivenPolyline(allCoords.slice(0, closestIdx + 1))
+        const driven = allCoords.slice(0, closestIdx + 1)
+        const remaining = allCoords.slice(closestIdx)
+        setDrivenPolyline(driven)
+        setRemainingPolyline(remaining)
       }
     }
 
@@ -220,10 +225,10 @@ export default function RouteScreen({ route, navigation }: any) {
 
     // Rerouting — uses destinationRef so never stale
     const now = Date.now()
-    if (now - lastRerouteRef.current > 8000 && allCoords.length > 0) {
+    if (now - lastRerouteRef.current > 15000 && allCoords.length > 0) {
       const closestIdx = closestPolylineIndex(allCoords, latitude, longitude)
       const distToRoute = haversine(latitude, longitude, allCoords[closestIdx].latitude, allCoords[closestIdx].longitude)
-      if (distToRoute > 80) {
+      if (distToRoute > 150) {
         lastRerouteRef.current = now
         setRerouting(true)
         speak('Recalculating.')
@@ -250,6 +255,7 @@ export default function RouteScreen({ route, navigation }: any) {
     currentStepRef.current = 0
     lastSpokenStepRef.current = -1
     setDrivenPolyline([])
+    setRemainingPolyline([...polylineRef.current])
     const steps = stepsRef.current
     if (steps[0]) {
       speak('Starting navigation. ' + stripHtml(steps[0].html_instructions) + '. ' + (steps[0].distance?.text || ''))
@@ -267,6 +273,7 @@ export default function RouteScreen({ route, navigation }: any) {
     locationSubRef.current?.remove()
     locationSubRef.current = null
     setDrivenPolyline([])
+    setRemainingPolyline([...polylineRef.current])
     drivenIdxRef.current = 0
     const info = routeInfoRef.current || routeInfo
     if (mapRef.current && info) {
@@ -363,13 +370,11 @@ export default function RouteScreen({ route, navigation }: any) {
           <Polyline coordinates={drivenPolyline} strokeColor="#333333" strokeWidth={5} zIndex={1} />
         )}
         {/* Remaining route — blue */}
-        {polyline.length > 0 && (
+        {(remainingPolyline.length > 1 || polyline.length > 0) && (
           <Polyline
-            coordinates={drivenPolyline.length > 1
-              ? polyline.slice(drivenIdxRef.current)
-              : polyline}
+            coordinates={remainingPolyline.length > 1 ? remainingPolyline : polyline}
             strokeColor="#007AFF"
-            strokeWidth={5}
+            strokeWidth={6}
             zIndex={2}
           />
         )}
