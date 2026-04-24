@@ -423,18 +423,21 @@ export default function RouteScreen({ route, navigation }: any) {
           <View style={s.routeRow}><View style={s.dot8} /><Text style={s.city}>{origin}</Text></View>
           <View style={s.routeLine} />
           <View style={s.routeRow}><View style={[s.dot8, { backgroundColor: C.accent }]} /><Text style={s.city}>{destination}</Text></View>
-          <View style={{ flexDirection: 'row', gap: 8, marginTop: 16, marginBottom: 12 }}>
-            <TouchableOpacity onPress={navigating ? stopNavigation : startNavigation}
+          {/* Row 1: Navigate + Back */}
+          <View style={{ flexDirection: 'row', gap: 8, marginTop: 16, marginBottom: 8 }}>
+            <TouchableOpacity
+              onPress={navigating ? stopNavigation : startNavigation}
               style={[s.navMainBtn, { flex: 1, backgroundColor: navigating ? '#C97B7B' : C.primary }]}>
-              <Text style={s.navMainBtnTxt}>{navigating ? '⏹ STOP' : '🧭 NAVIGATE'}</Text>
+              <Text style={s.navMainBtnTxt}>{navigating ? 'STOP' : 'NAVIGATE'}</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => { if (navigating) stopNavigation(); navigation.goBack(); }}
+            <TouchableOpacity
+              onPress={() => { if (navigating) stopNavigation(); navigation.goBack(); }}
               style={[s.navMainBtn, { backgroundColor: '#F5F5F7', paddingHorizontal: 16 }]}>
-              <Text style={[s.navMainBtnTxt, { color: '#6E6E73' }]}>← NEW</Text>
+              <Text style={[s.navMainBtnTxt, { color: '#6E6E73' }]}>BACK</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={shareRoute} style={[s.navMainBtn, { backgroundColor: '#8BAF8B', paddingHorizontal: 14 }]}>
-              <Text style={s.navMainBtnTxt}>📤</Text>
-            </TouchableOpacity>
+          </View>
+          {/* Row 2: Save + Share */}
+          <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
             <TouchableOpacity
               disabled={saving}
               onPress={async () => {
@@ -444,32 +447,15 @@ export default function RouteScreen({ route, navigation }: any) {
                 const ok = await saveRoute({ origin, destination, distance_text: info.distance, duration_text: info.duration, total_m: info.totalM, plan_by_day: planByDay, limit_type: limitType, limit_value: limitValue })
                 setSaving(false)
                 track('route_saved', { origin, destination })
-                alert(ok ? '✅ Route saved!' : '❌ Could not save.')
+                alert(ok ? 'Route saved!' : 'Could not save.')
               }}
-              style={[s.navMainBtn, { backgroundColor: '#7BA7BC', paddingHorizontal: 14, opacity: saving ? 0.6 : 1 }]}>
-              <Text style={s.navMainBtnTxt}>{saving ? '...' : '💾'}</Text>
+              style={[s.navMainBtn, { flex: 1, backgroundColor: '#7BA7BC', opacity: saving ? 0.6 : 1 }]}>
+              <Text style={s.navMainBtnTxt}>{saving ? 'SAVING...' : 'SAVE ROUTE'}</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              disabled={saving}
-              onPress={async () => {
-                const info = routeInfoRef.current || routeInfo
-                if (!info) return
-                setSaving(true)
-                const ok = await saveRoute({
-                  origin, destination,
-                  distance_text: info.distance,
-                  duration_text: info.duration,
-                  total_m: info.totalM,
-                  plan_by_day: planByDay,
-                  limit_type: limitType,
-                  limit_value: limitValue,
-                })
-                setSaving(false)
-                track('route_saved', { origin, destination })
-                alert(ok ? '✅ Route saved!' : '❌ Could not save. Try again.')
-              }}
-              style={[s.navMainBtn, { backgroundColor: '#7BA7BC', paddingHorizontal: 16, opacity: saving ? 0.6 : 1 }]}>
-              <Text style={s.navMainBtnTxt}>{saving ? '...' : '💾'}</Text>
+              onPress={shareRoute}
+              style={[s.navMainBtn, { flex: 1, backgroundColor: '#8BAF8B' }]}>
+              <Text style={s.navMainBtnTxt}>SHARE</Text>
             </TouchableOpacity>
           </View>
           <View style={s.stats}>
