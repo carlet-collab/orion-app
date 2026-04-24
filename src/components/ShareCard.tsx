@@ -10,9 +10,12 @@ interface Props {
   distance: string
   duration: string
   days?: number
+  hotelCount?: number
+  diningCount?: number
+  sightsCount?: number
 }
 
-export default function ShareCard({ visible, onClose, origin, destination, distance, duration, days }: Props) {
+export default function ShareCard({ visible, onClose, origin, destination, distance, duration, days, hotelCount, diningCount, sightsCount }: Props) {
   const originCity = origin.split(',')[0]
   const destCity = destination.split(',')[0]
 
@@ -20,7 +23,7 @@ export default function ShareCard({ visible, onClose, origin, destination, dista
     const message =
       `🧭 ${originCity} → ${destCity}\n` +
       `${distance} · ${duration}${days && days > 1 ? ` · ${days} days` : ''}\n\n` +
-      `Hotels, restaurants and attractions found automatically along the route.\n\n` +
+      `${hotelCount ? `🏨 ${hotelCount} hotels` : '🏨 Hotels'} · ${diningCount ? `🍽️ ${diningCount} restaurants` : '🍽️ Restaurants'} · ${sightsCount ? `🎭 ${sightsCount} sights` : '🎭 Sights'} found along the route\n\n` +
       `Planned on Orion — oriontravel.app`
     try {
       await Share.share({ message, title: `${originCity} → ${destCity} on Orion` })
@@ -86,9 +89,9 @@ export default function ShareCard({ visible, onClose, origin, destination, dista
               {/* Features */}
               <View style={s.features}>
                 {[
-                  { icon: '🏨', label: 'Hotels along your route' },
-                  { icon: '🍽️', label: 'Restaurants on the way' },
-                  { icon: '🎭', label: 'Sights and attractions' },
+                  { icon: '🏨', label: hotelCount ? `${hotelCount} hotels along your route` : 'Hotels along your route' },
+                  { icon: '🍽️', label: diningCount ? `${diningCount} restaurants on the way` : 'Restaurants on the way' },
+                  { icon: '🎭', label: sightsCount ? `${sightsCount} sights and attractions` : 'Sights and attractions' },
                 ].map((f, i) => (
                   <View key={i} style={s.featureRow}>
                     <Text style={s.featureIcon}>{f.icon}</Text>

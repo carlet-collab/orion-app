@@ -551,6 +551,9 @@ export default function RouteScreen({ route, navigation }: any) {
         distance={routeInfo?.distance || ''}
         duration={routeInfo?.duration || ''}
         days={planByDay ? limitValue : undefined}
+        hotelCount={places.filter((p: any) => p.types?.includes('lodging')).length || undefined}
+        diningCount={places.filter((p: any) => p.types?.includes('restaurant') || p.types?.includes('food')).length || undefined}
+        sightsCount={places.filter((p: any) => p.types?.includes('tourist_attraction') || p.types?.includes('museum')).length || undefined}
       />
     </View>
   )
