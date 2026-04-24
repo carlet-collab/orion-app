@@ -8,6 +8,7 @@ import { getDirectionsUrl, getPlacesUrl, haversine, decodePolyline, stripHtml, F
 import { track, saveRoute } from '../lib/tracking'
 import { registerForPushNotifications } from '../lib/notifications'
 import RatingModal from '../components/RatingModal'
+import ShareCard from '../components/ShareCard'
 import * as Sharing from 'expo-sharing'
 
 const C = { primary: '#1A1A1A', accent: '#7BA7BC', bg: '#FAFAFA', surface: '#FFFFFF', border: '#E8E8E8', hint: '#AEAEB2', secondary: '#6E6E73' }
@@ -64,6 +65,7 @@ export default function RouteScreen({ route, navigation }: any) {
   const [voiceEnabled, setVoiceEnabled] = useState(true)
   const [saving, setSaving] = useState(false)
   const [showRating, setShowRating] = useState(false)
+  const [showShareCard, setShowShareCard] = useState(false)
 
   // Keep refs in sync with state
   useEffect(() => { voiceEnabledRef.current = voiceEnabled }, [voiceEnabled])
@@ -252,17 +254,9 @@ export default function RouteScreen({ route, navigation }: any) {
     }
   }, []) // stable — no deps needed, all from refs
 
-  const shareRoute = async () => {
-    const shareUrl = `https://oriontravel.app/plan?from=${encodeURIComponent(origin)}&to=${encodeURIComponent(destination)}`
-    const message = `Check out this road trip on Orion! ${origin} → ${destination}\n\n${shareUrl}`
-    try {
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(shareUrl, { dialogTitle: `${origin} → ${destination}`, mimeType: 'text/plain', UTI: 'public.plain-text' })
-      } else {
-        alert(message)
-      }
-      track('route_shared', { origin, destination })
-    } catch (e) { console.error(e) }
+  const shareRoute = () => {
+    setShowShareCard(true)
+    track('share_card_opened', { origin, destination })
   }
 
   const startNavigation = async () => {
