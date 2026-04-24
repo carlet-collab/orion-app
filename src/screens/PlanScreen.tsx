@@ -135,6 +135,9 @@ export default function PlanScreen({ navigation }: any) {
             <TouchableOpacity onPress={() => navigation.navigate('MyRoutes')} style={s.myRoutesBtn}>
               <Text style={s.myRoutesBtnTxt}>🗺 My saved routes</Text>
             </TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.navigate('Discover')} style={s.myRoutesBtn}>
+              <Text style={s.myRoutesBtnTxt}>✨ Discover curated routes</Text>
+            </TouchableOpacity>
           </View>
 
           <View style={s.icons}>

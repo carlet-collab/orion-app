@@ -106,6 +106,9 @@ export default function HomeScreen({ navigation }: any) {
             <TouchableOpacity onPress={() => navigation.navigate('Plan')} style={s.ctaPrimary}>
               <Text style={s.ctaPrimaryTxt}>PLAN YOUR ROUTE →</Text>
             </TouchableOpacity>
+            <TouchableOpacity onPress={() => navigation.navigate('Discover')} style={s.ctaSecondary}>
+              <Text style={s.ctaSecondaryTxt}>🗺 DISCOVER ROUTES</Text>
+            </TouchableOpacity>
           </Animated.View>
         </SafeAreaView>
       </View>
@@ -218,8 +221,10 @@ const s = StyleSheet.create({
   bookBtn: { borderRadius: 6, padding: 7, alignItems: 'center' },
   bookBtnTxt: { fontSize: 9, fontWeight: '700', color: '#fff', letterSpacing: 1 },
   // CTAs
-  ctaPrimary: { backgroundColor: '#fff', borderRadius: 12, padding: 16, alignItems: 'center' },
+  ctaPrimary: { backgroundColor: '#fff', borderRadius: 12, padding: 16, alignItems: 'center', marginBottom: 10 },
   ctaPrimaryTxt: { color: '#1A1A1A', fontSize: 12, fontWeight: '700', letterSpacing: 2 },
+  ctaSecondary: { borderRadius: 12, padding: 14, alignItems: 'center', borderWidth: 1, borderColor: 'rgba(255,255,255,0.2)' },
+  ctaSecondaryTxt: { color: '#fff', fontSize: 12, fontWeight: '600', letterSpacing: 1, opacity: 0.9 },
   // Stats
   stats: { flexDirection: 'row', backgroundColor: C.surface, borderBottomWidth: 1, borderBottomColor: C.border },
   stat: { flex: 1, padding: 16, alignItems: 'center' },
