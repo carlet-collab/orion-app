@@ -1,10 +1,16 @@
 import React, { useState } from 'react'
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, SafeAreaView } from 'react-native'
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, KeyboardAvoidingView, Platform, SafeAreaView } from 'react-native'
 import { GOOGLE_MAPS_KEY } from '../lib/maps'
 import AutocompleteInput from '../components/AutocompleteInput'
 import * as Location from 'expo-location'
 
 const C = { primary: '#1A1A1A', accent: '#7BA7BC', bg: '#FAFAFA', surface: '#FFFFFF', border: '#E8E8E8', hint: '#AEAEB2', secondary: '#6E6E73' }
+
+const ROUTE_TYPES = [
+  { key: 'fastest', label: '⚡ Fastest', avoid: '' },
+  { key: 'notolls', label: '💰 No Tolls', avoid: 'tolls' },
+  { key: 'scenic', label: '🌿 Scenic', avoid: 'highways' },
+]
 
 export default function PlanScreen({ navigation }: any) {
   const [origin, setOrigin] = useState('')
@@ -12,6 +18,7 @@ export default function PlanScreen({ navigation }: any) {
   const [planByDay, setPlanByDay] = useState(false)
   const [limitType, setLimitType] = useState<'days'|'hours'|'km'>('days')
   const [limitValue, setLimitValue] = useState(2)
+  const [routeType, setRouteType] = useState('fastest')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -31,7 +38,8 @@ export default function PlanScreen({ navigation }: any) {
       const res = await fetch(`https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(origin)}&key=${GOOGLE_MAPS_KEY}`)
       const data = await res.json()
       if (data.status !== 'OK') { setError('Could not find origin. Try being more specific.'); setLoading(false); return }
-      navigation.navigate('Route', { origin, destination, planByDay, limitType, limitValue })
+      const avoid = ROUTE_TYPES.find(r => r.key === routeType)?.avoid || ''
+      navigation.navigate('Route', { origin, destination, planByDay, limitType, limitValue, avoid })
     } catch (e) { setError('Something went wrong.') }
     setLoading(false)
   }
@@ -57,18 +65,40 @@ export default function PlanScreen({ navigation }: any) {
           <Text style={s.subtitle}>Hotels, restaurants, attractions and tours — curated along your exact route.</Text>
 
           <View style={s.card}>
-            <View style={{flexDirection:'row',justifyContent:'space-between',alignItems:'center',marginBottom:8}}>
-              <Text style={[s.label,{marginBottom:0}]}>FROM</Text>
-              <TouchableOpacity onPress={getMyLocation} style={{flexDirection:'row',alignItems:'center',gap:4,backgroundColor:'#F0F7FF',paddingHorizontal:10,paddingVertical:5,borderRadius:20,borderWidth:1,borderColor:'#7BA7BC30'}}>
-                <Text style={{fontSize:11}}>📍</Text>
-                <Text style={{fontSize:11,fontWeight:'600',color:'#7BA7BC'}}>Use my location</Text>
+            {/* FROM */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <Text style={[s.label, { marginBottom: 0 }]}>FROM</Text>
+              <TouchableOpacity onPress={getMyLocation} style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F0F7FF', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: '#7BA7BC30' }}>
+                <Text style={{ fontSize: 11 }}>📍</Text>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: '#7BA7BC' }}>Use my location</Text>
               </TouchableOpacity>
             </View>
             <AutocompleteInput value={origin} onChangeText={setOrigin} onSelect={setOrigin} placeholder="Prague, Czech Republic" mode="local" />
 
+            {/* TO */}
             <Text style={[s.label, { marginTop: 16 }]}>TO</Text>
             <AutocompleteInput value={destination} onChangeText={setDestination} onSelect={setDestination} placeholder="Madrid, Spain" mode="city" />
 
+            {/* Route type */}
+            <Text style={[s.label, { marginTop: 16 }]}>ROUTE TYPE</Text>
+            <View style={s.routeTypeRow}>
+              {ROUTE_TYPES.map(rt => (
+                <TouchableOpacity
+                  key={rt.key}
+                  onPress={() => setRouteType(rt.key)}
+                  style={[s.routeTypeBtn, {
+                    backgroundColor: routeType === rt.key ? C.primary : C.surface,
+                    borderColor: routeType === rt.key ? C.primary : C.border,
+                  }]}
+                >
+                  <Text style={[s.routeTypeTxt, { color: routeType === rt.key ? '#fff' : C.secondary }]}>
+                    {rt.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Plan by day */}
             <View style={s.toggle}>
               <View>
                 <Text style={s.toggleTitle}>Plan by day</Text>
@@ -82,17 +112,17 @@ export default function PlanScreen({ navigation }: any) {
             {planByDay && (
               <View style={s.limitRow}>
                 <View style={s.limitTypes}>
-                  {(['days','hours','km'] as const).map(t => (
-                    <TouchableOpacity key={t} onPress={() => { setLimitType(t); setLimitValue(t==='days'?2:t==='hours'?8:500) }}
-                      style={[s.limitTypeBtn, { backgroundColor: limitType===t ? C.accent : 'transparent' }]}>
-                      <Text style={[s.limitTypeTxt, { color: limitType===t ? '#fff' : C.secondary }]}>{t.charAt(0).toUpperCase()+t.slice(1)}</Text>
+                  {(['days', 'hours', 'km'] as const).map(t => (
+                    <TouchableOpacity key={t} onPress={() => { setLimitType(t); setLimitValue(t === 'days' ? 2 : t === 'hours' ? 8 : 500) }}
+                      style={[s.limitTypeBtn, { backgroundColor: limitType === t ? C.accent : 'transparent' }]}>
+                      <Text style={[s.limitTypeTxt2, { color: limitType === t ? '#fff' : C.secondary }]}>{t.charAt(0).toUpperCase() + t.slice(1)}</Text>
                     </TouchableOpacity>
                   ))}
                 </View>
                 <View style={s.limitVal}>
-                  <TouchableOpacity onPress={() => setLimitValue(v => Math.max(1, v-1))} style={s.limitBtn}><Text style={s.limitBtnTxt}>−</Text></TouchableOpacity>
+                  <TouchableOpacity onPress={() => setLimitValue(v => Math.max(1, v - 1))} style={s.limitBtn}><Text style={s.limitBtnTxt}>−</Text></TouchableOpacity>
                   <Text style={s.limitValTxt}>{limitValue} {limitType}</Text>
-                  <TouchableOpacity onPress={() => setLimitValue(v => v+1)} style={s.limitBtn}><Text style={s.limitBtnTxt}>+</Text></TouchableOpacity>
+                  <TouchableOpacity onPress={() => setLimitValue(v => v + 1)} style={s.limitBtn}><Text style={s.limitBtnTxt}>+</Text></TouchableOpacity>
                 </View>
               </View>
             )}
@@ -108,9 +138,9 @@ export default function PlanScreen({ navigation }: any) {
           </View>
 
           <View style={s.icons}>
-            {[['🏨','Hotels','#7BA7BC'],['🍽️','Dining','#8BAF8B'],['🎭','Sights','#9B8BB4'],['🎯','Tours','#7BBCB0']].map(([icon,label,color]) => (
+            {[['🏨', 'Hotels', '#7BA7BC'], ['🍽️', 'Dining', '#8BAF8B'], ['🎭', 'Sights', '#9B8BB4'], ['🎯', 'Tours', '#7BBCB0']].map(([icon, label, color]) => (
               <View key={label} style={s.iconItem}>
-                <View style={[s.iconBox, { backgroundColor: color+'20', borderColor: color+'50' }]}><Text style={{ fontSize: 22 }}>{icon}</Text></View>
+                <View style={[s.iconBox, { backgroundColor: color + '20', borderColor: color + '50' }]}><Text style={{ fontSize: 22 }}>{icon}</Text></View>
                 <Text style={s.iconLabel}>{label}</Text>
               </View>
             ))}
@@ -133,8 +163,10 @@ const s = StyleSheet.create({
   subtitle: { fontSize: 14, color: '#6E6E73', lineHeight: 22, marginBottom: 28 },
   card: { backgroundColor: '#fff', borderRadius: 20, padding: 22, borderWidth: 1, borderColor: '#E8E8E8', marginBottom: 28, zIndex: 100, overflow: 'visible' },
   label: { fontSize: 10, fontWeight: '600', color: '#AEAEB2', letterSpacing: 2, marginBottom: 8 },
-  input: { backgroundColor: '#F5F5F7', borderRadius: 10, padding: 13, fontSize: 14, color: '#1A1A1A', borderWidth: 1, borderColor: '#E8E8E8' },
-  toggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F5F5F7', borderRadius: 12, padding: 14, marginTop: 18 },
+  routeTypeRow: { flexDirection: 'row', gap: 8 },
+  routeTypeBtn: { flex: 1, borderRadius: 10, borderWidth: 1, paddingVertical: 10, alignItems: 'center' },
+  routeTypeTxt: { fontSize: 11, fontWeight: '600' },
+  toggle: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F5F5F7', borderRadius: 12, padding: 14, marginTop: 16 },
   toggleTitle: { fontSize: 13, fontWeight: '600', color: '#1A1A1A' },
   toggleSub: { fontSize: 11, color: '#AEAEB2', marginTop: 2 },
   toggleBtn: { width: 44, height: 24, borderRadius: 12, position: 'relative' },
@@ -142,7 +174,7 @@ const s = StyleSheet.create({
   limitRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14 },
   limitTypes: { flexDirection: 'row', borderRadius: 8, borderWidth: 1, borderColor: '#E8E8E8', overflow: 'hidden' },
   limitTypeBtn: { paddingVertical: 8, paddingHorizontal: 12 },
-  limitTypeTxt: { fontSize: 11, fontWeight: '600' },
+  limitTypeTxt2: { fontSize: 11, fontWeight: '600' },
   limitVal: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#F5F5F7', borderRadius: 8, paddingHorizontal: 4 },
   limitBtn: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   limitBtnTxt: { fontSize: 22, color: '#1A1A1A' },

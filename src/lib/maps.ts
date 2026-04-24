@@ -1,7 +1,8 @@
 export const GOOGLE_MAPS_KEY = 'AIzaSyBrTT7_GB3uM3Fp36xXAWvliWL4eM8PsxY'
 
-export function getDirectionsUrl(origin: string, destination: string) {
-  return `https://maps.googleapis.com/maps/api/directions/json?origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&key=${GOOGLE_MAPS_KEY}`
+export function getDirectionsUrl(origin: string, destination: string, avoid?: string) {
+  const avoidParam = avoid ? `&avoid=${avoid}` : ''
+  return `https://maps.googleapis.com/maps/api/directions/json?origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}${avoidParam}&key=${GOOGLE_MAPS_KEY}`
 }
 
 export function getPlacesUrl(lat: number, lng: number, type: string, radius: number) {

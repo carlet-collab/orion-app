@@ -6,6 +6,9 @@ import * as Speech from 'expo-speech'
 import { useKeepAwake } from 'expo-keep-awake'
 import { getDirectionsUrl, getPlacesUrl, haversine, decodePolyline, stripHtml, FILTERS } from '../lib/maps'
 import { track, saveRoute } from '../lib/tracking'
+import { registerForPushNotifications } from '../lib/notifications'
+import * as Sharing from 'expo-sharing'
+import { track, saveRoute } from '../lib/tracking'
 
 const C = { primary: '#1A1A1A', accent: '#7BA7BC', bg: '#FAFAFA', surface: '#FFFFFF', border: '#E8E8E8', hint: '#AEAEB2', secondary: '#6E6E73' }
 const { width: W } = Dimensions.get('window')
@@ -21,7 +24,7 @@ function closestPolylineIndex(coords: any[], lat: number, lng: number): number {
 }
 
 export default function RouteScreen({ route, navigation }: any) {
-  const { origin, destination, planByDay, limitType, limitValue } = route.params
+  const { origin, destination, planByDay, limitType, limitValue, avoid = '' } = route.params
   useKeepAwake()
 
   const mapRef = useRef<MapView>(null)
@@ -60,6 +63,7 @@ export default function RouteScreen({ route, navigation }: any) {
   const [currentStep, setCurrentStep] = useState(0)
   const [voiceEnabled, setVoiceEnabled] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   // Keep refs in sync with state
   useEffect(() => { voiceEnabledRef.current = voiceEnabled }, [voiceEnabled])
@@ -69,7 +73,10 @@ export default function RouteScreen({ route, navigation }: any) {
   const currentSteps = planByDay && stages.length > 0 ? (stages[activeDay]?.steps || []) : steps
   const activeF = FILTERS.find(f => f.key === activeFilter)!
 
-  useEffect(() => { fetchRoute(origin, destination, false) }, [])
+  useEffect(() => {
+    fetchRoute(origin, destination, false)
+    registerForPushNotifications()
+  }, [])
   useEffect(() => { if (routeInfo) fetchPlaces(null) }, [activeFilter, activeDay, routeInfo])
   useEffect(() => { return () => { locationSubRef.current?.remove(); Speech.stop() } }, [])
 
@@ -135,7 +142,7 @@ export default function RouteScreen({ route, navigation }: any) {
   const fetchRoute = async (from: string, to: string, isReroute: boolean) => {
     if (!isReroute) setLoading(true)
     try {
-      const res = await fetch(getDirectionsUrl(from, to))
+      const res = await fetch(getDirectionsUrl(from, to, avoid))
       const data = await res.json()
       if (data.status === 'OK' && data.routes?.[0]) {
         processRouteData(data, isReroute)
@@ -244,6 +251,19 @@ export default function RouteScreen({ route, navigation }: any) {
       fetchPlaces({ latitude, longitude })
     }
   }, []) // stable — no deps needed, all from refs
+
+  const shareRoute = async () => {
+    const shareUrl = `https://oriontravel.app/plan?from=${encodeURIComponent(origin)}&to=${encodeURIComponent(destination)}`
+    const message = `Check out this road trip on Orion! ${origin} → ${destination}\n\n${shareUrl}`
+    try {
+      if (await Sharing.isAvailableAsync()) {
+        await Sharing.shareAsync(shareUrl, { dialogTitle: `${origin} → ${destination}`, mimeType: 'text/plain', UTI: 'public.plain-text' })
+      } else {
+        alert(message)
+      }
+      track('route_shared', { origin, destination })
+    } catch (e) { console.error(e) }
+  }
 
   const startNavigation = async () => {
     const { status } = await Location.requestForegroundPermissionsAsync()
@@ -413,6 +433,23 @@ export default function RouteScreen({ route, navigation }: any) {
             <TouchableOpacity onPress={() => { if (navigating) stopNavigation(); navigation.goBack(); }}
               style={[s.navMainBtn, { backgroundColor: '#F5F5F7', paddingHorizontal: 16 }]}>
               <Text style={[s.navMainBtnTxt, { color: '#6E6E73' }]}>← NEW</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={shareRoute} style={[s.navMainBtn, { backgroundColor: '#8BAF8B', paddingHorizontal: 14 }]}>
+              <Text style={s.navMainBtnTxt}>📤</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              disabled={saving}
+              onPress={async () => {
+                const info = routeInfoRef.current || routeInfo
+                if (!info) return
+                setSaving(true)
+                const ok = await saveRoute({ origin, destination, distance_text: info.distance, duration_text: info.duration, total_m: info.totalM, plan_by_day: planByDay, limit_type: limitType, limit_value: limitValue })
+                setSaving(false)
+                track('route_saved', { origin, destination })
+                alert(ok ? '✅ Route saved!' : '❌ Could not save.')
+              }}
+              style={[s.navMainBtn, { backgroundColor: '#7BA7BC', paddingHorizontal: 14, opacity: saving ? 0.6 : 1 }]}>
+              <Text style={s.navMainBtnTxt}>{saving ? '...' : '💾'}</Text>
             </TouchableOpacity>
             <TouchableOpacity
               disabled={saving}
