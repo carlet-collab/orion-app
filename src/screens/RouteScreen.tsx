@@ -62,7 +62,6 @@ export default function RouteScreen({ route, navigation }: any) {
   const [currentStep, setCurrentStep] = useState(0)
   const [voiceEnabled, setVoiceEnabled] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [saving, setSaving] = useState(false)
 
   // Keep refs in sync with state
   useEffect(() => { voiceEnabledRef.current = voiceEnabled }, [voiceEnabled])
