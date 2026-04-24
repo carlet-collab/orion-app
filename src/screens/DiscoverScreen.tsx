@@ -167,13 +167,10 @@ export default function DiscoverScreen({ navigation }: any) {
     : ROUTES.filter(r => r.tags.includes(activeTag))
 
   const useRoute = (r: any) => {
-    navigation.navigate('Route', {
-      origin: r.origin,
-      destination: r.destination,
-      planByDay: true,
-      limitType: 'days',
-      limitValue: r.days,
-      avoid: '',
+    navigation.navigate('Plan', {
+      prefillOrigin: r.origin,
+      prefillDestination: r.destination,
+      prefillDays: r.days,
     })
   }
 

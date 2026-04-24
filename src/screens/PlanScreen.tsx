@@ -12,12 +12,13 @@ const ROUTE_TYPES = [
   { key: 'scenic', label: '🌿 Scenic', avoid: 'highways' },
 ]
 
-export default function PlanScreen({ navigation }: any) {
-  const [origin, setOrigin] = useState('')
-  const [destination, setDestination] = useState('')
-  const [planByDay, setPlanByDay] = useState(false)
+export default function PlanScreen({ navigation, route }: any) {
+  const prefill = route?.params || {}
+  const [origin, setOrigin] = useState(prefill.prefillOrigin || '')
+  const [destination, setDestination] = useState(prefill.prefillDestination || '')
+  const [planByDay, setPlanByDay] = useState(!!prefill.prefillDays)
   const [limitType, setLimitType] = useState<'days'|'hours'|'km'>('days')
-  const [limitValue, setLimitValue] = useState(2)
+  const [limitValue, setLimitValue] = useState(prefill.prefillDays || 2)
   const [routeType, setRouteType] = useState('fastest')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
