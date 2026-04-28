@@ -85,6 +85,10 @@ export default function RouteScreen({ route, navigation }: any) {
   const [showShareCard, setShowShareCard] = useState(false)
   const [remainingTime, setRemainingTime] = useState<string>('')
   const [detourDestination, setDetourDestination] = useState<any>(null)
+  const remainingSecondsRef = useRef(0)
+  const countdownRef = useRef<any>(null)
+  const detourActiveRef = useRef(false)
+  const detourDestRef = useRef<any>(null)
 
   useEffect(() => { voiceEnabledRef.current = voiceEnabled }, [voiceEnabled])
   useEffect(() => { activeFilterRef.current = activeFilter }, [activeFilter])
@@ -285,14 +289,11 @@ export default function RouteScreen({ route, navigation }: any) {
         setDrivenPolyline(driven)
         setRemainingPolyline(remaining)
 
-        // FIX 3: Update remaining time based on remaining steps
-        const stps = stepsRef.current
-        const stepIdx = currentStepRef.current
-        let remSec = 0
-        for (let i = stepIdx; i < stps.length; i++) {
-          remSec += stps[i].durationSec || stps[i].duration?.value || 0
-        }
-        if (remSec > 0) setRemainingTime(formatDuration(remSec))
+        // Update remaining seconds based on progress through polyline
+        const progress = drivenIdxRef.current / Math.max(polylineRef.current.length, 1)
+        const totalSec = routeInfoRef.current?.totalSec || 0
+        const remSec = Math.round(totalSec * (1 - progress))
+        if (remSec > 0) remainingSecondsRef.current = remSec
       }
     }
 
@@ -348,24 +349,38 @@ export default function RouteScreen({ route, navigation }: any) {
 
     Alert.alert(
       `Go to ${placeName}?`,
-      'Navigation will route you here then continue to your destination.',
+      'We will navigate you there then resume your route to ' + destination.split(',')[0] + '.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Navigate Here',
+          text: 'Take Me There',
           onPress: () => {
+            // Save detour destination
+            detourActiveRef.current = true
+            detourDestRef.current = { name: placeName, lat: placeLat, lng: placeLng }
             setDetourDestination({ name: placeName, lat: placeLat, lng: placeLng })
-            // Reroute to place first, then destination
-            fetchRoute(`${userLatRef.current},${userLngRef.current}`, `${placeLat},${placeLng}`, true)
-              .then(() => {
-                // After arriving at place, route to original destination
-                destinationRef.current = destination
-              })
+            // Reroute from current position to place
+            const from = `${userLatRef.current},${userLngRef.current}`
+            const to = `${placeLat},${placeLng}`
+            destinationRef.current = to
+            fetchRoute(from, to, true)
+            speak('Navigating to ' + placeName)
             track('detour_started', { place: placeName, origin, destination })
           }
         }
       ]
     )
+  }
+
+  const resumeOriginalRoute = () => {
+    detourActiveRef.current = false
+    detourDestRef.current = null
+    setDetourDestination(null)
+    destinationRef.current = destination
+    const from = `${userLatRef.current},${userLngRef.current}`
+    fetchRoute(from, destination, true)
+    speak('Resuming route to ' + destination.split(',')[0])
+    track('detour_resumed', { origin, destination })
   }
 
   const shareRoute = () => {
@@ -386,7 +401,18 @@ export default function RouteScreen({ route, navigation }: any) {
     setDrivenPolyline([])
     setRemainingPolyline([...polylineRef.current])
     const info = routeInfoRef.current
-    if (info) setRemainingTime(info.duration)
+    if (info) {
+      setRemainingTime(info.duration)
+      remainingSecondsRef.current = info.totalSec || 0
+    }
+    // Start countdown timer — updates every 30 seconds smoothly
+    if (countdownRef.current) clearInterval(countdownRef.current)
+    countdownRef.current = setInterval(() => {
+      if (remainingSecondsRef.current > 30) {
+        remainingSecondsRef.current -= 30
+        setRemainingTime(formatDuration(remainingSecondsRef.current))
+      }
+    }, 30000)
     const stps = stepsRef.current
     if (stps[0]) {
       setTimeout(() => {
@@ -403,7 +429,10 @@ export default function RouteScreen({ route, navigation }: any) {
     navigatingRef.current = false
     setNavigating(false)
     setDetourDestination(null)
+    detourActiveRef.current = false
+    detourDestRef.current = null
     Speech.stop()
+    if (countdownRef.current) { clearInterval(countdownRef.current); countdownRef.current = null }
     if (drivenIdxRef.current > 10) setShowRating(true)
     locationSubRef.current?.remove()
     locationSubRef.current = null
@@ -450,7 +479,14 @@ export default function RouteScreen({ route, navigation }: any) {
 
       {/* Navigation banner */}
       {navigating && (
-        <SafeAreaView style={{ backgroundColor: rerouting ? '#C97B7B' : '#1A1A1A' }}>
+        <SafeAreaView style={{ backgroundColor: detourDestination ? '#7BA7BC' : rerouting ? '#C97B7B' : '#1A1A1A' }}>
+          {/* Detour resume bar */}
+          {detourDestination && (
+            <TouchableOpacity onPress={resumeOriginalRoute} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 8, backgroundColor: 'rgba(0,0,0,0.2)' }}>
+              <Text style={{ fontSize: 11, color: '#fff', fontWeight: '600' }}>🏁 {destination.split(',')[0]}</Text>
+              <Text style={{ fontSize: 11, color: '#fff', fontWeight: '700', backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 20 }}>RESUME ORIGINAL ROUTE →</Text>
+            </TouchableOpacity>
+          )}
           <View style={s.navBanner}>
             <TouchableOpacity onPress={() => { const n = Math.max(0, currentStepRef.current - 1); currentStepRef.current = n; setCurrentStep(n) }} style={s.navBtn}>
               <Text style={s.navBtnTxt}>←</Text>
@@ -460,12 +496,15 @@ export default function RouteScreen({ route, navigation }: any) {
                 <Text style={[s.navInstruction, { color: '#fff' }]}>🔄 Recalculating...</Text>
               ) : (
                 <>
-                  <Text style={s.navStepNum}>STEP {currentStep + 1} / {currentSteps.length} · {remainingTime} remaining</Text>
+                  {detourDestination ? (
+                    <Text style={s.navStepNum}>DETOUR · {detourDestination.name}</Text>
+                  ) : (
+                    <Text style={s.navStepNum}>STEP {currentStep + 1} / {currentSteps.length} · {remainingTime} remaining</Text>
+                  )}
                   <Text style={s.navInstruction} numberOfLines={2}>
-                    {currentSteps[currentStep] ? stripHtml(currentSteps[currentStep].html_instructions) : '🎉 You have arrived!'}
+                    {currentSteps[currentStep] ? stripHtml(currentSteps[currentStep].html_instructions) : detourDestination ? '🎉 You have arrived! Tap Resume to continue.' : '🎉 You have arrived!'}
                   </Text>
                   {currentSteps[currentStep]?.distance?.text && <Text style={s.navDist}>{currentSteps[currentStep].distance.text}</Text>}
-                  {detourDestination && <Text style={{ fontSize: 10, color: '#7BA7BC', marginTop: 2 }}>Detour: {detourDestination.name}</Text>}
                 </>
               )}
             </View>
