@@ -190,25 +190,32 @@ export default function RouteScreen({ route, navigation }: any) {
     if (!isReroute) setLoading(false)
   }
 
-  // FIX 5: Fetch places AHEAD of current position, sorted by distance
   const fetchPlaces = async (pos: { latitude: number, longitude: number } | null) => {
     const info = routeInfoRef.current || routeInfo
     if (!info) return
     setPlacesLoading(true)
 
-    // During navigation — fetch from 5km AHEAD on the route, not midpoint
     let center = { latitude: info.midLat, longitude: info.midLng }
-    if (pos && navigatingRef.current) {
-      const allCoords = polylineRef.current
-      const currentIdx = drivenIdxRef.current
-      // Look 5km ahead on the polyline
-      let aheadDist = 0
-      let aheadIdx = currentIdx
-      for (let i = currentIdx; i < allCoords.length - 1; i++) {
-        aheadDist += haversine(allCoords[i].latitude, allCoords[i].longitude, allCoords[i+1].latitude, allCoords[i+1].longitude)
-        if (aheadDist > 5000) { aheadIdx = i; break }
+
+    if (pos) {
+      if (navigatingRef.current) {
+        // During navigation — look 10km ahead on polyline
+        const allCoords = polylineRef.current
+        const currentIdx = drivenIdxRef.current
+        let aheadDist = 0
+        let aheadIdx = currentIdx
+        for (let i = currentIdx; i < allCoords.length - 1; i++) {
+          aheadDist += haversine(allCoords[i].latitude, allCoords[i].longitude, allCoords[i+1].latitude, allCoords[i+1].longitude)
+          if (aheadDist > 10000) { aheadIdx = i; break }
+        }
+        center = {
+          latitude: allCoords[aheadIdx]?.latitude || pos.latitude,
+          longitude: allCoords[aheadIdx]?.longitude || pos.longitude
+        }
+      } else {
+        // Before navigation — use actual user location
+        center = { latitude: pos.latitude, longitude: pos.longitude }
       }
-      center = { latitude: allCoords[aheadIdx]?.latitude || pos.latitude, longitude: allCoords[aheadIdx]?.longitude || pos.longitude }
     }
 
     try {
