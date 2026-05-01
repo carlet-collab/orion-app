@@ -243,7 +243,13 @@ export default function RouteScreen({ route, navigation }: any) {
       const withDist = filtered.map((p: any) => {
         const dist = p.geometry?.location ? haversine(userLat, userLng, p.geometry.location.lat, p.geometry.location.lng) : 999999
         return { ...p, distanceM: Math.round(dist) }
-      }).sort((a: any, b: any) => a.distanceM - b.distanceM)
+      }).sort((a: any, b: any) => {
+        // Within 2km — sort purely by distance
+        if (a.distanceM < 2000 && b.distanceM < 2000) return a.distanceM - b.distanceM
+        // Beyond 2km — sort by rating then distance
+        if (a.rating && b.rating) return b.rating - a.rating
+        return a.distanceM - b.distanceM
+      })
 
       setPlaces(withDist.slice(0, 18))
     } catch (e) { console.error(e) }
